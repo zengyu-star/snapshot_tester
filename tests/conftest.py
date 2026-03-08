@@ -38,3 +38,22 @@ def runner(config):
 def mutator(runner, config):
     """创建造数器（整个测试会话共享）"""
     return DataMutator(runner, config.get("data_model", {}))
+
+
+# ==================== 日志增强 Hook ====================
+import logging
+test_logger = logging.getLogger("TestStatus")
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_logreport(report):
+    """
+    将每个用例的最终执行结果 (PASSED/FAILED) 写入日志文件
+    """
+    yield
+    # 我们只关心 call 阶段（用例正文执行阶段）的结果
+    if report.when == "call":
+        status = report.outcome.upper()
+        nodeid = report.nodeid
+        test_logger.info(f"TEST RESULT: [{status}] - {nodeid}")
+        if report.failed:
+            test_logger.error(f"TEST FAILURE DETAIL: {report.longreprtext}")

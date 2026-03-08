@@ -21,14 +21,13 @@ snapshot_tester/
 ├── config.yml              # 全局配置（端点映射、Mock 模式开关、数据拓扑）
 ├── dual_runner.py          # 核心驱动：双端命令下发与一致性仲裁逻辑
 ├── setup_offline_env.sh    # 环境保障：离线包封装与本地 venv 自动化部署
+├── logs/                   # 运行日志：自动按时间戳分文件记录 (run_YYYY-MM-DD_HH-mm-ss.log)
 ├── tests/                  # 测试套件
-│   ├── test_strategy.md    # 测试白皮书：定义了 F1-F12 章节的 72 个用例
-│   ├── test_helpers.py     # 测试基础设施：SnapshotSandbox 与 容器路径映射工具
-│   ├── test_f1_lifecycle.py       # P0: 快照生命周期 (Create/Delete/Rename)
-│   ├── test_f2_snapshot_diff.py   # P0: 差异报告准确性 (snapshotDiff +/-/M/R)
-│   ├── test_f11_readonly_block.py # P0: 只读性拦截 (隐藏目录写保护验证)
-│   └── ...                 # 更多 F 系列专项测试
-└── host_venv/              # 自动生成的本地隔离执行环境 (由 setup_offline_env.sh 维护)
+│   ├── test_strategy.md    # 测试白皮书：定义了 F1-F14 章节的全部用例
+│   ├── conftest.py         # Pytest 配置：内嵌结果捕获 Hook 与全局 Fixture
+│   ├── test_f1_lifecycle.py       # P0: 快照全生命周期功能验证
+│   └── ...                 # F1-F14 专项测试文件
+└── host_venv/              # 隔离执行环境 (由 setup_offline_env.sh 维护)
 ```
 
 ---
@@ -50,10 +49,36 @@ global:
 ```
 
 ### 3. 执行测试
-一键运行全量 P0 验证：
+
+框架集成了 `pytest` 标记系统，支持按优先级（Priority）精细化执行：
+
+#### A. 运行指定优先级的用例
 ```bash
-pytest tests/ -v -s --tb=short
+# 执行最核心的 P0 用例 (快速冒烟)
+pytest -m p0 -v
+
+# 执行 P1 级验证用例
+pytest -m p1 -v
+
+# 执行全量 P2 高级/场景化用例
+pytest -m p2 -v
 ```
+
+#### B. 生成可视化 HTML 报表
+执行完毕后可直接查看图形化测试结果，包含成功率统计与耗时分析：
+```bash
+pytest -m p1 --html=report.html --self-contained-html
+```
+
+#### C. 运行特定专项测试
+```bash
+# 仅运行“只读性拦截”相关测试
+pytest tests/test_f11_readonly_block.py -v -s
+```
+
+#### D. 日志追踪
+执行期间，详细的步骤信息与双端比对指纹会实时同步至 `logs/` 目录。
+文件名包含精确时间戳，例如 `run_2026-03-08_20-10-31.log`。你可以通过搜索 `TEST RESULT` 快速定位用例状态。
 
 ---
 

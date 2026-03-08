@@ -1,6 +1,7 @@
 import logging
 import os
 import sys
+import datetime
 from logging.handlers import RotatingFileHandler
 
 def setup_logging(level=logging.INFO):
@@ -34,9 +35,9 @@ def setup_logging(level=logging.INFO):
     logs_dir = os.path.join(project_root, "logs")
     os.makedirs(logs_dir, exist_ok=True)
     
-    log_file = os.path.join(logs_dir, "run_latest.log")
+    log_file = os.path.join(logs_dir, f"run_{datetime.datetime.now().strftime('%Y-%m-%d_%H-%M-%S')}.log")
     
-    # 每个文件最大 10MB，保留 5 个备份
+    # 每个文件最大 10MB，保留 5 个备份 (TimedRotating 通常按时间切分，但用户希望独立文件)
     file_handler = RotatingFileHandler(
         filename=log_file,
         maxBytes=10 * 1024 * 1024,

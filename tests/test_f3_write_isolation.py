@@ -14,6 +14,7 @@ from dual_runner import ParityValidator
 logger = logging.getLogger("TestWriteIsolation")
 
 
+@pytest.mark.p0
 class TestWriteIsolation:
     """快照 × 写入命令隔离性 (F3-01, F3-02, F3-03, F3-05)"""
 
@@ -26,6 +27,7 @@ class TestWriteIsolation:
         yield
         self.sandbox.teardown()
 
+    @pytest.mark.p0
     def test_f3_01_put_not_visible_in_snapshot(self, runner):
         """F3-01: 赋权 -> 快照A -> put新文件 -> ls .snapshot/A -> 验证新文件不可见"""
         self.sandbox.create_snapshot("snap_v1")
@@ -43,6 +45,7 @@ class TestWriteIsolation:
         assert "new_after_snap.dat" not in res_h.stdout, \
             f"put 后的文件不应出现在快照中: {res_h.stdout}"
 
+    @pytest.mark.p0
     def test_f3_02_touchz_not_visible_in_snapshot(self, runner):
         """F3-02: 赋权 -> 快照A -> touchz新文件 -> ls .snapshot/A -> 验证新文件不可见"""
         self.sandbox.create_snapshot("snap_v1")
@@ -59,6 +62,7 @@ class TestWriteIsolation:
         assert "touched_file.dat" not in res_h.stdout, \
             f"touchz 后的文件不应出现在快照中: {res_h.stdout}"
 
+    @pytest.mark.p0
     def test_f3_03_put_overwrite_snapshot_preserves_original(self, runner):
         """F3-03: 赋权 -> 造数 -> 快照A -> put覆盖已有文件 -> cat .snapshot/A/file -> 验证内容是原始值"""
         original_content = "ORIGINAL_CONTENT_F3_03"
@@ -76,6 +80,7 @@ class TestWriteIsolation:
         assert original_content in res_h.stdout, \
             f"快照中的文件应保持原始内容，实际: {res_h.stdout}"
 
+    @pytest.mark.p0
     def test_f3_05_append_snapshot_preserves_original(self, runner):
         """F3-05: 赋权 -> 造数 -> 快照A -> appendToFile -> cat .snapshot/A/file -> 验证内容是追加前原始值"""
         original_content = "ORIGINAL_CONTENT_F3_05"
@@ -99,3 +104,38 @@ class TestWriteIsolation:
         ParityValidator.assert_results_match(res_h, res_o)
         assert res_h.stdout == original_content, \
             f"快照中文件应只包含原始内容 '{original_content}'，实际: '{res_h.stdout}'"
+
+    @pytest.mark.p1
+    def test_f3_06_multiple_append_isolation(self, runner):
+        """F3-06: 多次追加后快照间内容隔离"""
+        create_test_file(runner, f"{self.sandbox.test_dir}/multi_append.dat", "V1")
+        self.sandbox.create_snapshot("snap_v1")
+        
+        host_tmp, container_tmp = create_local_tmp_file("_V2")
+        try:
+            runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{self.sandbox.test_dir}/multi_append.dat")
+        finally:
+            cleanup_local_tmp(host_tmp)
+        self.sandbox.create_snapshot("snap_v2")
+
+        res_h1, _ = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/multi_append.dat")
+        res_h2, _ = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v2/multi_append.dat")
+        assert res_h1.stdout == "V1"
+        assert res_h2.stdout == "V1_V2"
+
+    @pytest.mark.p1
+    def test_f3_07_append_then_rm_snapshot_preserved(self, runner):
+        """F3-07: 追加后删除，快照仍保留原始版本"""
+        create_test_file(runner, f"{self.sandbox.test_dir}/rm_test.dat", "ORIG")
+        self.sandbox.create_snapshot("snap_v1")
+        
+        host_tmp, container_tmp = create_local_tmp_file("_APPEND")
+        try:
+            runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{self.sandbox.test_dir}/rm_test.dat")
+        finally:
+            cleanup_local_tmp(host_tmp)
+        runner.run_dual_cmd("-rm", f"{{TARGET}}{self.sandbox.test_dir}/rm_test.dat")
+        
+        res_h, res_o = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/rm_test.dat")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert res_h.stdout == "ORIG"

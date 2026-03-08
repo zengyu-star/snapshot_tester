@@ -64,6 +64,7 @@ class TestSnapshotLifecycle:
         self.runner.run_dual_cmd("-rm", "-r", "-f", f"{{TARGET}}{self.test_dir}")
         logger.info("=== 测试沙箱清理完毕 ===")
 
+    @pytest.mark.p0
     def test_full_lifecycle_parity(self):
         """主测试链路：验证 OBSA 插件的快照行为是否与原生 HDFS 达到像素级一致"""
         
@@ -103,3 +104,48 @@ class TestSnapshotLifecycle:
         
         # 断言 2：抛出的异常拦截信息必须一致
         ParityValidator.assert_results_match(res_h, res_o)
+
+    @pytest.mark.p1
+    def test_f1_02_rename_snapshot(self):
+        """F1-02: renameSnapshot(A→X) -> 验证可见性"""
+        self.runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{self.test_dir}")
+        self.runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{self.test_dir}", "snap_A")
+        
+        res_h, res_o = self.runner.run_dual_cmd("-renameSnapshot", f"{{TARGET}}{self.test_dir}", "snap_A", "snap_X")
+        ParityValidator.assert_results_match(res_h, res_o)
+        
+        # 验证 X 可见，A 不可见
+        ls_h, _ = self.runner.run_dual_cmd("-ls", f"{{TARGET}}{self.test_dir}/.snapshot")
+        assert "snap_X" in ls_h.stdout
+        assert "snap_A" not in ls_h.stdout
+
+    @pytest.mark.p1
+    def test_f1_03_delete_snapshot(self):
+        """F1-03: deleteSnapshot(A) -> 验证消失"""
+        self.runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{self.test_dir}")
+        self.runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{self.test_dir}", "snap_to_del")
+        
+        res_h, res_o = self.runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{self.test_dir}", "snap_to_del")
+        ParityValidator.assert_results_match(res_h, res_o)
+        
+        ls_h, _ = self.runner.run_dual_cmd("-ls", f"{{TARGET}}{self.test_dir}/.snapshot")
+        assert "snap_to_del" not in ls_h.stdout
+
+    @pytest.mark.p1
+    def test_f1_05_disallow_with_snapshots_fails(self):
+        """F1-05: 有快照时 disallowSnapshot 必须被拦截"""
+        self.runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{self.test_dir}")
+        self.runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{self.test_dir}", "snap_exist")
+        
+        res_h, res_o = self.runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{self.test_dir}")
+        assert res_h.returncode != 0
+        assert res_o.returncode != 0
+        ParityValidator.assert_results_match(res_h, res_o)
+
+    @pytest.mark.p1
+    def test_f1_07_allow_idempotency(self):
+        """F1-07: allowSnapshot 幂等性"""
+        self.runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{self.test_dir}")
+        res_h, res_o = self.runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{self.test_dir}")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert res_h.returncode == 0

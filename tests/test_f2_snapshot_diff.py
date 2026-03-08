@@ -14,6 +14,7 @@ from dual_runner import ParityValidator
 logger = logging.getLogger("TestSnapshotDiff")
 
 
+@pytest.mark.p0
 class TestSnapshotDiff:
     """snapshotDiff 差异标记全覆盖 (F2-01 ~ F2-09)"""
 

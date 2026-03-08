@@ -15,7 +15,8 @@ from dual_runner import ParityValidator
 logger = logging.getLogger("TestReadonlyBlock")
 
 
-class TestReadonlyBlock:
+@pytest.mark.p0
+class TestReadonlyIsolation:
     """只读隔离性 —— .snapshot 写操作全拦截 (F11-01 ~ F11-08)"""
 
     @pytest.fixture(autouse=True)
