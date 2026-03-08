@@ -26,6 +26,7 @@ You are an expert developer working on the `snapshot_tester` project. Follow the
 - **Logging**: Use `logging.getLogger("...")` after calling `setup_logging()` from `utils.log_config`.
 - **Offline Readiness**: Any new dependency must be added to `requirements.txt` and checked for offline compatibility via `setup_offline_env.sh`.
 - **Test Execution**: Preferred command: `pytest tests/ -v -s --tb=short`.
+- **Git Operations**: **NEVER** automatically perform `git commit` or `git push` unless the user explicitly and manually requests it in the current turn.
 
 ## 4. File Mapping Summary
 - `dual_runner.py`: Core logic for command sub-dispatching.
