@@ -32,72 +32,105 @@ snapshot_tester/
 
 ---
 
-## 🚀 三、 快速上手
+## 🚀 三、 快速上手 (外网 -> 内网一键迁移)
 
-### 1. 环境准备 (离线/内网)
-如果是首次在隔离环境运行：
+本框架支持在**离线环境**下的一键式部署。
+
+### 1. 外网打包 (Pack)
+在有外网的开发机上执行：
 ```bash
+bash ./setup_offline_env.sh pack
+```
+产物：项目上一级目录下的 `obsa_test_framework_offline.tar.gz`。
+
+### 2. 内网安装 (Install)
+将压缩包上传至内网节点并解压：
+```bash
+tar -xzvf obsa_test_framework_offline.tar.gz
+cd snapshot_tester
 bash ./setup_offline_env.sh install
 source venv/bin/activate
 ```
 
-### 2. 配置准星 (`config.yml`)
-确保 `mock_obsa_mode` 按需配置。Mock 模式（开启时）会自动将 OBS 路径映射至 HDFS 的测试子目录：
-```yaml
-global:
-  mock_obsa_mode: true  # 建议先在 Mock 模式验证逻辑，再切真机 OBS
-```
+---
 
-### 3. 执行测试
+## 🧪 四、 测试执行模式
 
-框架集成了 `pytest` 标记系统，支持按优先级（Priority）精细化执行：
+通过修改 `config.yml` 中的 `mock_obsa_mode` 切换运行模式：
 
-#### A. 运行指定优先级的用例
+| 模式 | 配置 | 说明 |
+| :--- | :--- | :--- |
+| **Mock 模式** | `true` | **推荐模式**。将 OBS 命令重定向至本地 HDFS 的 Mock 路径。适合在没有 OBSA 插件的环境下验证快照逻辑与 Hadoop 命令的一致性。 |
+| **实测模式** | `false` | 使用真实的 `obs://` 路径和 OBSA 插件进行端到端生产级验证。 |
+
+---
+
+## 📂 五、 测试执行与用例体系
+
+用例定义于 `tests/` 目录，遵循 `tests/test_strategy.md` 规划：
+
+- **命名规范**：`test_f{章节}_{功能点}.py`
+- **核心用例库**：
+    - `test_f1_lifecycle.py`: 快照全生命周期主流程 (P0)
+    - `test_f2_snapshot_diff.py`: `snapshotDiff` 差异标记 (+/-/M/R) 深度验证 (P0)
+    - `test_f11_readonly_block.py`: `.snapshot` 隐藏目录全指令写拦截验证 (P0)
+    - `test_f12_multi_snap_chain.py`: 多快照时序链与删除中间态验证 (P2)
+    - `...`: 涵盖权限、副本、深层嵌套等 F1-F14 全场景。
+
+### 1. 执行命令示例
+
 ```bash
-# 执行最核心的 P0 用例 (快速冒烟)
+# A. 执行最核心的 P0 用例 (快速冒烟)
 pytest -m p0 -v
 
-# 执行 P1 级验证用例
+# B. 执行 P1 级验证用例
 pytest -m p1 -v
 
-# 执行全量 P2 高级/场景化用例
+# C. 执行全量 P2 高级/场景化用例
 pytest -m p2 -v
-```
 
-#### B. 生成可视化 HTML 报表
-执行完毕后可直接查看图形化测试结果，包含成功率统计与耗时分析：
-```bash
+# D. 生成可视化 HTML 报表 (推荐)
 pytest -m p1 --html=report.html --self-contained-html
 ```
 
-#### C. 运行特定专项测试
-```bash
-# 仅运行“只读性拦截”相关测试
-pytest tests/test_f11_readonly_block.py -v -s
-```
-
-#### D. 日志追踪
+### 2. 日志追踪
 执行期间，详细的步骤信息与双端比对指纹会实时同步至 `logs/` 目录。
 文件名包含精确时间戳，例如 `run_2026-03-08_20-10-31.log`。你可以通过搜索 `TEST RESULT` 快速定位用例状态。
 
 ---
 
-## 🔍 四、 核心工作流：SnapshotDiff 验证
+## 🔍 六、 核心工作流：SnapshotDiff 验证
 
-本框架最强大的功能之一是验证差异报告的一致性。测试会模拟如下变异序列：
-1. **Snap A** -> **新增文件/删除文件/追加数据/重命名** -> **Snap B**
-2. 调用 `hdfs snapshotDiff` 获取增量报告。
-3. 比对 HDFS 原生标记与 OBSA 插件标记（`+`/`-`/`M`/`R`）是否字节级对齐。
+本框架最强大的功能之一是验证差异报告的一致性。测试会验证以下标记的字节级对齐：
+
+- **`+` (Added)**: 活跃目录新增的文件/目录。
+- **`-` (Deleted)**: 活跃目录中被删除但快照中仍存的文件/目录。
+- **`M` (Modified)**: 内容发生变更、Metadata 变化或执行过 `truncate`。
+- **`R` (Renamed)**: 同目录下发生的移动/重命名行为。
 
 ---
 
-## 🛠️ 五、 常见问题解答 (FAQ)
+## 🛠️ 七、 常见问题排查 (Troubleshooting)
 
-- **为什么 appendToFile 会失败？**
-  在单 DataNode 的 Docker Mock 环境中，这是常见的 HDFS 默认流水线冲突。
-  **解决**：本框架已自动注入 `replace-datanode-on-failure.enable=false` 配置。
-- **如何新增自定义用例？**
-  在 `tests/` 下参考 `test_f11_readonly_block.py`，使用 `SnapshotSandbox` 快速构建您的测试沙箱。
+### 1. Docker 环境下 appendToFile 报错
+**现象**：`java.io.IOException: Failed to replace a bad datanode...`
+**原因**：在单 DataNode 的 Mock/Docker 环境中，HDFS 默认流水线策略导致追加写入失败。
+**解决**：本框架已自动注入 `replace-datanode-on-failure.enable=false` 配置。
+
+### 2. snapshotDiff 命令不可用
+**提示**：`-snapshotDiff: Unknown command`
+**原因**：`snapshotDiff` 是 `hdfs` 的顶层命令，而非 `dfs` 的子命令。
+- 正确：`hdfs snapshotDiff <path> <v1> <v2>`
+- 错误：`hdfs dfs -snapshotDiff ...`
+**解决**: 框架底层 `dual_runner.py` 已自动处理此差异。
+
+---
+
+## 📝 八、 开发与扩展
+
+若需新增测试用例，请参考 `tests/test_helpers.py`：
+- 使用 `SnapshotSandbox` 管理沙箱环境。
+- 使用 `create_test_file` 替代传统的本地 `put` 流程，确保容器内外路径映射正确（宿主机目录挂载于容器 `/obsa_workspace`）。
 
 ---
 
