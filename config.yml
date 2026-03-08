@@ -1,0 +1,34 @@
+# ==========================================
+# OBSA 插件快照特性自动化测试框架配置
+# ==========================================
+
+global:
+  log_level: "INFO"
+  log_dir: "/var/log/obsa_test"
+  max_workers: 10
+  global_timeout_sec: 7200
+  dry_run: false
+  mock_obsa_mode: true  # 新增: 无OBSA插件时开启，将OBS请求打向本地HDFS的另一个沙箱目录
+
+cluster_env:
+  hadoop_namenode: "hdfs://namenode:8020"
+  test_base_path: "/test/obsa_test_workspace"
+  obsa_cli_path: "/opt/huawei/obsa/bin/obsa"
+  obs_bucket: "internal-test-bucket-01"
+  obs_endpoint: "obs.cn-internal-1.company.local"
+
+data_model:
+  file_size_kb: 1024
+  file_count: 50
+  directory_depth: 3
+  enable_md5_baseline: true
+  baseline_export_path: "./output/baseline.json"
+
+snapshot_test:
+  prefix: "auto_snap_"
+  max_snapshots_per_dir: 10
+  wait_after_create_sec: 5
+  verification:
+    strict_metadata_check: true
+    retry_count: 3
+    retry_interval_sec: 10

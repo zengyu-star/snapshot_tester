@@ -1,0 +1,5 @@
+wheel==0.37.1           # 必须显式加入，解决你的报错
+pytest==7.4.4           # 支持 Python 3.7 的最后一个大版本
+pytest-html==3.2.0      # 兼容 pytest 7.x
+PyYAML==6.0.1           # 解析 config.yaml
+pydantic==1.10.13       # pydantic V2 不支持 3.7，必须降级到 V1

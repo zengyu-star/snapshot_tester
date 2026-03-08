@@ -1,0 +1,17 @@
+.agents/
+.pytest_cache/
+__pycache__/
+host_venv/
+logs/
+offline_packages/
+.DS_Store
+*.pyc
+*.pyo
+*.pyd
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
