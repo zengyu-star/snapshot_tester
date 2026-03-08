@@ -44,6 +44,8 @@ class DualHadoopCommandRunner:
         local_hdfs = os.path.join(os.getcwd(), "hdfs")
         self.base_cli = [local_hdfs, "dfs"] if os.path.exists(local_hdfs) else ["hdfs", "dfs"]
         self.admin_cli = [local_hdfs, "dfsadmin"] if os.path.exists(local_hdfs) else ["hdfs", "dfsadmin"]
+        # 顶层 hdfs 命令（如 snapshotDiff），不经过 dfs/dfsadmin 子命令
+        self.hdfs_cli = [local_hdfs] if os.path.exists(local_hdfs) else ["hdfs"]
 
     def _execute(self, cmd_list: List[str], protocol: str) -> CmdResult:
         full_cmd_str = " ".join(cmd_list)
@@ -79,6 +81,19 @@ class DualHadoopCommandRunner:
         """使用 {TARGET} 占位符动态组装 dfsadmin 命令"""
         hdfs_cmd = self.admin_cli + [action]
         obs_cmd = self.admin_cli + [action]
+        for arg in args:
+            if "{TARGET}" in arg:
+                hdfs_cmd.append(arg.replace("{TARGET}", self.hdfs_base))
+                obs_cmd.append(arg.replace("{TARGET}", self.obs_base))
+            else:
+                hdfs_cmd.append(arg)
+                obs_cmd.append(arg)
+        return self._execute(hdfs_cmd, "hdfs"), self._execute(obs_cmd, "obs")
+
+    def run_dual_hdfs_cmd(self, subcmd: str, *args) -> Tuple[CmdResult, CmdResult]:
+        """使用 {TARGET} 占位符动态组装顶层 hdfs 命令（如 snapshotDiff）"""
+        hdfs_cmd = self.hdfs_cli + [subcmd]
+        obs_cmd = self.hdfs_cli + [subcmd]
         for arg in args:
             if "{TARGET}" in arg:
                 hdfs_cmd.append(arg.replace("{TARGET}", self.hdfs_base))

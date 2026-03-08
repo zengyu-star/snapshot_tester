@@ -89,7 +89,7 @@ class TestSnapshotLifecycle:
 
         logger.info(">>> 步骤 6: 验证 snapshotDiff 差异树的结构一致性")
         # 强制比对 Hadoop 的 M, +, - 等差异标记符是否分毫不差
-        res_h, res_o = self.runner.run_dual_cmd("-snapshotDiff", f"{{TARGET}}{self.test_dir}", "snap_v1", "snap_v2")
+        res_h, res_o = self.runner.run_dual_hdfs_cmd("snapshotDiff", f"{{TARGET}}{self.test_dir}", "snap_v1", "snap_v2")
         ParityValidator.assert_results_match(res_h, res_o, strict_error_match=True)
 
         logger.info(">>> 步骤 7: 验证 .snapshot 隐藏目录的只读隔离性 (越权拦截测试)")
