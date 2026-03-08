@@ -1,0 +1,34 @@
+# OBSA Snapshot Parity Tester - AI Rules (.cursorrules)
+
+You are an expert developer working on the `snapshot_tester` project. Follow these core principles and patterns to ensure consistency and parity.
+
+## 1. Project Context
+- **Objective**: Verify that Huawei Cloud OBSA (OBS) snapshot functionality matches native HDFS behavior.
+- **Methodology**: "Dual-Run Parity" - every command is sent to both HDFS and OBS, and their outputs (stdout, stderr, returncode) are compared.
+
+## 2. Core Development Patterns
+
+### 🚨 Parity Mandatory Logic
+- **NEVER** use `subprocess.run` or `os.system` directly for Hadoop/HDFS/OBS commands.
+- **ALWAYS** use `DualHadoopCommandRunner` (located in `dual_runner.py`) for command execution.
+- **ALWAYS** use the `{TARGET}` placeholder in path arguments. The runner will automatically replace it with `hdfs_base` or `obs_base`.
+
+### 🧪 Testing Standards
+- **Sandbox Usage**: Use `SnapshotSandbox` in `tests/test_helpers.py` for all test cases.
+- **Lifecycle**: Ensure `setup()` is called before tests and `teardown()` after tests (even on failure) to clean up snapshots and directories.
+- **Assertion**: Use `ParityValidator.assert_results_match` to compare results between HDFS and OBS.
+
+### ⚙️ Configuration & Environment
+- **Mock Mode**: Be aware of `global.mock_obsa_mode` in `config.yml`. When enabled, the runner redirects `obs://` paths to a local HDFS mock directory.
+- **Python Compatibility**: Maintain compatibility with **Python 3.7.9** for deployment in restricted environments.
+
+## 3. Workflow Guidelines
+- **Logging**: Use `logging.getLogger("...")` after calling `setup_logging()` from `utils.log_config`.
+- **Offline Readiness**: Any new dependency must be added to `requirements.txt` and checked for offline compatibility via `setup_offline_env.sh`.
+- **Test Execution**: Preferred command: `pytest tests/ -v -s --tb=short`.
+
+## 4. File Mapping Summary
+- `dual_runner.py`: Core logic for command sub-dispatching.
+- `tests/test_helpers.py`: Test infrastructure and sandbox.
+- `config.yml`: Global settings.
+- `utils/log_config.py`: Centralized logging configuration.
