@@ -51,8 +51,8 @@ class TestRecoveryCP:
         
         runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{self.sandbox.test_dir}/sub")
         
-        # 恢复整个目录
-        res_h, res_o = runner.run_dual_cmd("-cp", "-r",
+        # 恢复整个目录 (HDFS cp 不需要 -r，它默认就是递归的)
+        res_h, res_o = runner.run_dual_cmd("-cp",
             f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_tree/sub",
             f"{{TARGET}}{self.sandbox.test_dir}/sub_recovered"
         )
@@ -95,7 +95,10 @@ class TestRecoveryCP:
         create_test_file(runner, f"{self.sandbox.test_dir}/out.dat", "OUTSIDE")
         self.sandbox.create_snapshot("s1")
         
-        external_path = "/tmp/external_recovery_f6_05.dat"
+        external_path = "/f6_05_external/out.dat"
+        # 必须先创建父目录，否则 cp 会失败
+        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}/f6_05_external")
+        
         res_h, res_o = runner.run_dual_cmd("-cp",
             f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/s1/out.dat",
             f"{{TARGET}}{external_path}"
@@ -107,3 +110,4 @@ class TestRecoveryCP:
         assert cat_h.stdout == "OUTSIDE"
         # 清理
         runner.run_dual_cmd("-rm", f"{{TARGET}}{external_path}")
+        runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}/f6_05_external")

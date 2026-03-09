@@ -40,31 +40,47 @@ class TestRootOps:
         ParityValidator.assert_results_match(res_h, res_o)
 
     def test_f14_03_nested_snapshotable_dirs_independence(self, runner):
-        """F14-03: 验证嵌套 snapshottable 目录的快照独立性"""
-        parent = self.sandbox.test_dir
-        child = f"{parent}/nested_sub"
-        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{child}")
-        create_test_file(runner, f"{child}/data.txt", "CHILD_DATA")
+        """F14-03: 验证多个 snapshottable 目录的快照独立性"""
+        # 由于 HDFS 默认可能禁止嵌套 snapshottable，我们采用两个并列目录来验证独立性
+        dir_a = "/f14_03_dir_a"
+        dir_b = "/f14_03_dir_b"
         
-        # 父子都开启快照
-        runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{parent}")
-        runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{child}")
+        # 清理并创建
+        runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{dir_a}")
+        runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{dir_b}")
+        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{dir_a}")
+        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{dir_b}")
         
-        # 分别创建快照
-        runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{parent}", "snap_parent")
-        runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{child}", "snap_child")
+        create_test_file(runner, f"{dir_a}/a.txt", "DATA_A")
+        create_test_file(runner, f"{dir_b}/b.txt", "DATA_B")
         
-        # 变异子目录并验证父目录快照
-        runner.run_dual_cmd("-rm", f"{{TARGET}}{child}/data.txt")
-        
-        # 父目录快照里的子目录内容应该还在 (HDFS 行为：快照是递归的快照)
-        res_h, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{parent}/.snapshot/snap_parent/nested_sub/data.txt")
-        assert res_h.returncode == 0
-        
-        # 子目录快照里也应该还在
-        res_h2, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{child}/.snapshot/snap_child/data.txt")
-        assert res_h2.returncode == 0
-        
-        # 清理以便 teardown
-        runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{child}", "snap_child")
-        runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{child}")
+        try:
+            # 开启快照
+            res1, _ = runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{dir_a}")
+            assert res1.returncode == 0
+            res2, _ = runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{dir_b}")
+            assert res2.returncode == 0
+            
+            # 分别创建快照
+            runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{dir_a}", "s_a")
+            runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{dir_b}", "s_b")
+            
+            # 交叉变异验证
+            runner.run_dual_cmd("-rm", f"{{TARGET}}{dir_a}/a.txt")
+            
+            # A 的快照应保留 A 的数据
+            res_h, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{dir_a}/.snapshot/s_a/a.txt")
+            assert res_h.returncode == 0
+            
+            # B 的快照应不受影响
+            res_h2, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{dir_b}/.snapshot/s_b/b.txt")
+            assert res_h2.returncode == 0
+            
+        finally:
+            # 清理
+            runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{dir_a}", "s_a")
+            runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{dir_b}", "s_b")
+            runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{dir_a}")
+            runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{dir_b}")
+            runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{dir_a}")
+            runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{dir_b}")

@@ -24,6 +24,11 @@ if [ "$MODE" == "pack" ]; then
     # 利用 pip download 仅下载不安装（注意：外网开发机的 Python 版本与系统架构需与内网 Hadoop 节点尽量保持一致）
     ./host_venv/bin/pip download -r requirements.txt -d "${PACKAGE_DIR}"
     
+    echo ">>> 正在更新 config.yml 为内网环境默认配置..."
+    # 使用 sed 更新 HDFS 和 OBS 管理 URI
+    sed -i 's|hdfs_base_uri:.*|hdfs_base_uri: "hdfs://namenode:8020/native_obsa_test"|' config.yml
+    sed -i 's|obs_admin_uri:.*|obs_admin_uri: "hdfs://namenode:8020/hadoop/obsa_test_workspace"|' config.yml
+
     echo ">>> 依赖下载完成。正在打包整个测试工程..."
     
     # 获取父目录绝对路径
@@ -40,6 +45,7 @@ if [ "$MODE" == "pack" ]; then
         --exclude=".agents" \
         --exclude="__pycache__" \
         --exclude=".pytest_cache" \
+        --exclude="hdfs" \
         $(basename "${PROJECT_DIR}")
         
     echo ">>> [外网模式完成] 离线包已生成: ${OUTPUT_ARCHIVE}"

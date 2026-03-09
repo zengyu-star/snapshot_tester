@@ -104,22 +104,33 @@ class TestRmMvInteraction:
     @pytest.mark.p1
     def test_f5_06_rm_r_parent_containing_snapshot(self, runner):
         """F5-06: 赋权(子目录) -> 快照A -> 父目录 rm -r -> 拦截断言(不允许删除含快照的子目录)"""
-        parent_dir = f"{self.sandbox.test_dir}/p"
+        # 注意：HDFS 默认可能不允许嵌套的 snapshottable directory。
+        # 故我们使用一个和 sandbox 根平行的测试目录，避免和 sandbox root (已 allowSnapshot) 冲突。
+        parent_dir = "/f5_06_external_p"
         child_dir = f"{parent_dir}/c"
-        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{child_dir}")
         
-        # 对子目录开启快照并创建
-        runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{child_dir}")
-        runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{child_dir}", "s1")
+        # 清理旧数据并重新创建
+        runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{parent_dir}")
+        res, _ = runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{child_dir}")
+        assert res.returncode == 0
         
-        # 尝试删除父目录
-        res_h, res_o = runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{parent_dir}")
-        
-        # HDFS 应该拦截
-        assert res_h.returncode != 0
-        assert res_o.returncode != 0
-        ParityValidator.assert_results_match(res_h, res_o)
-        
-        # 清理子目录快照以便 teardown
-        runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{child_dir}", "s1")
-        runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{child_dir}")
+        try:
+            # 对子目录开启快照并创建
+            res_allow, _ = runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{child_dir}")
+            assert res_allow.returncode == 0, f"allowSnapshot failed: {res_allow.stderr}"
+            
+            res_create, _ = runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{child_dir}", "s1")
+            assert res_create.returncode == 0, f"createSnapshot failed: {res_create.stderr}"
+            
+            # 尝试删除父目录
+            res_h, res_o = runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{parent_dir}")
+            
+            # HDFS 应该拦截
+            assert res_h.returncode != 0, "HDFS should block deleting parent of a snapshot"
+            assert res_o.returncode != 0, "OBS should block deleting parent of a snapshot"
+            ParityValidator.assert_results_match(res_h, res_o)
+        finally:
+            # 强制清理快照以便后续删除
+            runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{child_dir}", "s1")
+            runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{child_dir}")
+            runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{parent_dir}")
