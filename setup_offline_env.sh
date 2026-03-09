@@ -24,10 +24,14 @@ if [ "$MODE" == "pack" ]; then
     # 利用 pip download 仅下载不安装（注意：外网开发机的 Python 版本与系统架构需与内网 Hadoop 节点尽量保持一致）
     ./host_venv/bin/pip download -r requirements.txt -d "${PACKAGE_DIR}"
     
-    echo ">>> 正在更新 config.yml 为内网环境默认配置..."
-    # 使用 sed 更新 HDFS 和 OBS 管理 URI
-    sed -i 's|hdfs_base_uri:.*|hdfs_base_uri: "hdfs://namenode:8020/native_obsa_test"|' config.yml
-    sed -i 's|obs_admin_uri:.*|obs_admin_uri: "hdfs://namenode:8020/hadoop/obsa_test_workspace"|' config.yml
+    echo ">>> 正在备份并更新 config.yml 为内网环境默认配置..."
+    # 临时备份，确保打包后本地配置不被污染
+    cp config.yml config.yml.bak
+
+    # 使用 sed 更新 HDFS 和 OBS 管理 URI 以及 Mock 模式
+    sed -i 's|hdfs_base_uri:.*|hdfs_base_uri: "hdfs://localhost:9000/native_obsa_test"|' config.yml
+    sed -i 's|obs_admin_uri:.*|obs_admin_uri: "hdfs://localhost:9000/hadoop/obsa_test_workspace"|' config.yml
+    sed -i 's|mock_obsa_mode:.*|mock_obsa_mode: false|' config.yml
 
     echo ">>> 依赖下载完成。正在打包整个测试工程..."
     
@@ -46,9 +50,14 @@ if [ "$MODE" == "pack" ]; then
         --exclude="__pycache__" \
         --exclude=".pytest_cache" \
         --exclude="hdfs" \
+        --exclude="*.bak" \
         $(basename "${PROJECT_DIR}")
+
+    # 打包完成后立即还原配置
+    mv "${PROJECT_DIR}/config.yml.bak" "${PROJECT_DIR}/config.yml"
+    echo ">>> [外网模式完成] 本地 config.yml 已还原。"
         
-    echo ">>> [外网模式完成] 离线包已生成: ${OUTPUT_ARCHIVE}"
+    echo ">>> 离线包已生成: ${OUTPUT_ARCHIVE}"
     echo ">>> 请将该压缩包拷贝至内网 Hadoop 节点执行 install 模式。"
 
 elif [ "$MODE" == "install" ]; then

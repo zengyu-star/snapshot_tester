@@ -90,10 +90,12 @@ class TestWriteIsolation:
         # 追加内容
         host_tmp, container_tmp = create_local_tmp_file("_EXTRA_APPENDED_DATA")
         try:
-            runner.run_dual_cmd(
+            res_h_append, res_o_append = runner.run_dual_cmd(
                 "-appendToFile", container_tmp,
                 f"{{TARGET}}{self.sandbox.test_dir}/append_me.dat"
             )
+            assert res_h_append.returncode == 0, f"HDFS 追加失败: {res_h_append.stderr}"
+            assert res_o_append.returncode == 0, f"OBSA 追加失败: {res_o_append.stderr}"
         finally:
             cleanup_local_tmp(host_tmp)
 
@@ -113,9 +115,12 @@ class TestWriteIsolation:
         
         host_tmp, container_tmp = create_local_tmp_file("_V2")
         try:
-            runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{self.sandbox.test_dir}/multi_append.dat")
+            res_h_append, res_o_append = runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{self.sandbox.test_dir}/multi_append.dat")
+            assert res_h_append.returncode == 0, f"HDFS 追加失败: {res_h_append.stderr}"
+            assert res_o_append.returncode == 0, f"OBSA 追加失败: {res_o_append.stderr}"
         finally:
             cleanup_local_tmp(host_tmp)
+            
         self.sandbox.create_snapshot("snap_v2")
 
         res_h1, _ = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/multi_append.dat")
@@ -131,9 +136,12 @@ class TestWriteIsolation:
         
         host_tmp, container_tmp = create_local_tmp_file("_APPEND")
         try:
-            runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{self.sandbox.test_dir}/rm_test.dat")
+            res_h_append, res_o_append = runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{self.sandbox.test_dir}/rm_test.dat")
+            assert res_h_append.returncode == 0, f"HDFS 追加失败: {res_h_append.stderr}"
+            assert res_o_append.returncode == 0, f"OBSA 追加失败: {res_o_append.stderr}"
         finally:
             cleanup_local_tmp(host_tmp)
+            
         runner.run_dual_cmd("-rm", f"{{TARGET}}{self.sandbox.test_dir}/rm_test.dat")
         
         res_h, res_o = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/rm_test.dat")

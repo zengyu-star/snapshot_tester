@@ -35,10 +35,12 @@ class TestReadTimeTravel:
         # 变异 1: 追加写入
         host_tmp, container_tmp = create_local_tmp_file("_MUTATION_APPENDED")
         try:
-            runner.run_dual_cmd(
+            res_h_append, res_o_append = runner.run_dual_cmd(
                 "-appendToFile", container_tmp,
                 f"{{TARGET}}{self.sandbox.test_dir}/time_travel.dat"
             )
+            assert res_h_append.returncode == 0, f"HDFS 追加失败: {res_h_append.stderr}"
+            assert res_o_append.returncode == 0, f"OBSA 追加失败: {res_o_append.stderr}"
         finally:
             cleanup_local_tmp(host_tmp)
 
@@ -88,7 +90,9 @@ class TestReadTimeTravel:
         
         host_tmp, container_tmp = create_local_tmp_file("_MODIFIED")
         try:
-            runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{path}")
+            res_h_append, res_o_append = runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{path}")
+            assert res_h_append.returncode == 0, f"HDFS 追加失败: {res_h_append.stderr}"
+            assert res_o_append.returncode == 0, f"OBSA 追加失败: {res_o_append.stderr}"
         finally:
             cleanup_local_tmp(host_tmp)
             
@@ -124,7 +128,9 @@ class TestReadTimeTravel:
         # 变异
         host_tmp, container_tmp = create_local_tmp_file("APPENDED_LINE\n")
         try:
-            runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{path}")
+            res_h_append, res_o_append = runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{path}")
+            assert res_h_append.returncode == 0, f"HDFS 追加失败: {res_h_append.stderr}"
+            assert res_o_append.returncode == 0, f"OBSA 追加失败: {res_o_append.stderr}"
         finally:
             cleanup_local_tmp(host_tmp)
             

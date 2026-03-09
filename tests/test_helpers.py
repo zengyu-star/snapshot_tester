@@ -7,6 +7,7 @@ import sys
 import logging
 import random
 import string
+import yaml
 
 # 添加项目根目录到 sys.path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -22,8 +23,29 @@ _CONTAINER_MOUNT = "/obsa_workspace"
 
 
 def _host_to_container(host_path):
-    """将宿主机路径转换为容器内挂载路径"""
-    return host_path.replace(_PROJECT_ROOT, _CONTAINER_MOUNT)
+    """
+    智能路径转换：自动兼容 Docker Mock 模式与物理机原生实测模式
+    """
+    # 1. 检查底层代理脚本是否存在（dual_runner 判断是否走 Docker 的依据）
+    local_hdfs_script = os.path.join(_PROJECT_ROOT, "hdfs")
+    
+    # 2. 读取 config.yml 中的运行模式
+    is_mock = False
+    config_path = os.path.join(_PROJECT_ROOT, "config.yml")
+    if os.path.exists(config_path):
+        try:
+            with open(config_path, "r", encoding="utf-8") as f:
+                conf = yaml.safe_load(f)
+                is_mock = conf.get("global", {}).get("mock_obsa_mode", False)
+        except Exception as e:
+            logger.warning(f"读取配置失败，默认使用实测模式路径: {e}")
+
+    # 判断：只有当配置为 mock_obsa_mode 且存在的 hdfs docker 代理脚本时，才执行路径转换
+    if is_mock and os.path.exists(local_hdfs_script):
+        return host_path.replace(_PROJECT_ROOT, _CONTAINER_MOUNT)
+    
+    # 实测模式下，直接返回宿主机真实绝对路径，供原生的 Hadoop 客户端调用
+    return host_path
 
 
 # ==================== 文件创建工具 ====================
