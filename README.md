@@ -8,7 +8,6 @@
 
 - **双端比对引擎 (Dual-Run Parity)**：同一指令同步下发至 HDFS 与 OBSA，深度比对 `stdout`/`stderr` 指纹及 `returncode`。
 - **阶梯式测试策略**：内置 72 个覆盖全场景的测试用例（`tests/test_strategy.md`），从基础 Lifecycle 到极端的越权拦截测试。
-- **已验证的 P0 用例集**：预置 24 个重点核心用例，并已在 Mock 模式下实现 **100% 通过率**。
 - **无缝离线部署**：内建 `setup_offline_env.sh` 工具，支持“外网一键打包、内网静默环境恢复”。
 - **灵活执行模式**：支持 `mock_obsa_mode`。在无真实 OBS 环境时，可通过本地 HDFS 沙箱模拟 OBSA 行为进行逻辑预演。
 
