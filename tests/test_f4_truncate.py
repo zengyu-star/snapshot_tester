@@ -69,3 +69,16 @@ class TestTruncateInteraction:
 
         res_h, res_o = runner.run_dual_cmd("-truncate", "-w", "1024", f"{{TARGET}}{self.sandbox.test_dir}/trunc_large.dat")
         ParityValidator.assert_results_match(res_h, res_o)
+
+    @pytest.mark.p1
+    def test_f4_06_truncate_larger_snapshot_content_preserved(self, runner):
+        """F4-06: truncate 截大后快照中文件内容不受影响"""
+        create_test_file_with_size(runner, f"{self.sandbox.test_dir}/content_iso.dat", 512)
+        self.sandbox.create_snapshot("snap_v1")
+        
+        # 尝试截大 (通常 HDFS 会失败，如果成功则验证隔离性)
+        runner.run_dual_cmd("-truncate", "-w", "1024", f"{{TARGET}}{self.sandbox.test_dir}/content_iso.dat")
+        
+        # 验证快照中依然是 512B
+        res_h, _ = runner.run_dual_cmd("-stat", "%b", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/content_iso.dat")
+        assert "512" in res_h.stdout

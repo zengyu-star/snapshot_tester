@@ -83,24 +83,34 @@ class SnapshotSandbox:
         """创建干净的沙箱目录"""
         logger.info(f"=== Sandbox Setup: {self.test_dir} ===")
         self.runner.run_dual_cmd("-rm", "-r", "-f", f"{{TARGET}}{self.test_dir}")
-        self.runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{self.test_dir}")
+        res_h, res_o = self.runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{self.test_dir}")
+        assert res_h.returncode == 0, f"Setup mkdir failed: {res_h.stderr}"
+        assert res_o.returncode == 0, f"Setup mkdir failed (OBS): {res_o.stderr}"
 
     def allow_snapshot(self):
         res_h, res_o = self.runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{self.test_dir}")
+        assert res_h.returncode == 0, f"allowSnapshot failed: {res_h.stderr}"
+        assert res_o.returncode == 0, f"allowSnapshot failed (OBS): {res_o.stderr}"
         return res_h, res_o
 
     def disallow_snapshot(self):
-        return self.runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{self.test_dir}")
+        res_h, res_o = self.runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{self.test_dir}")
+        return res_h, res_o
 
     def create_snapshot(self, snap_name):
+        res_h, res_o = self.runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{self.test_dir}", snap_name)
+        assert res_h.returncode == 0, f"createSnapshot {snap_name} failed: {res_h.stderr}"
+        assert res_o.returncode == 0, f"createSnapshot {snap_name} failed (OBS): {res_o.stderr}"
         self._snapshots.append(snap_name)
-        return self.runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{self.test_dir}", snap_name)
+        return res_h, res_o
 
     def delete_snapshot(self, snap_name):
-        res = self.runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{self.test_dir}", snap_name)
+        res_h, res_o = self.runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{self.test_dir}", snap_name)
+        assert res_h.returncode == 0, f"deleteSnapshot {snap_name} failed: {res_h.stderr}"
+        assert res_o.returncode == 0, f"deleteSnapshot {snap_name} failed (OBS): {res_o.stderr}"
         if snap_name in self._snapshots:
             self._snapshots.remove(snap_name)
-        return res
+        return res_h, res_o
 
     def teardown(self):
         """严苛清理：删除所有快照 -> 解除快照权限 -> 删除目录"""

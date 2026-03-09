@@ -38,3 +38,33 @@ class TestRootOps:
         assert res_h.returncode != 0
         assert res_o.returncode != 0
         ParityValidator.assert_results_match(res_h, res_o)
+
+    def test_f14_03_nested_snapshotable_dirs_independence(self, runner):
+        """F14-03: 验证嵌套 snapshottable 目录的快照独立性"""
+        parent = self.sandbox.test_dir
+        child = f"{parent}/nested_sub"
+        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{child}")
+        create_test_file(runner, f"{child}/data.txt", "CHILD_DATA")
+        
+        # 父子都开启快照
+        runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{parent}")
+        runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{child}")
+        
+        # 分别创建快照
+        runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{parent}", "snap_parent")
+        runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{child}", "snap_child")
+        
+        # 变异子目录并验证父目录快照
+        runner.run_dual_cmd("-rm", f"{{TARGET}}{child}/data.txt")
+        
+        # 父目录快照里的子目录内容应该还在 (HDFS 行为：快照是递归的快照)
+        res_h, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{parent}/.snapshot/snap_parent/nested_sub/data.txt")
+        assert res_h.returncode == 0
+        
+        # 子目录快照里也应该还在
+        res_h2, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{child}/.snapshot/snap_child/data.txt")
+        assert res_h2.returncode == 0
+        
+        # 清理以便 teardown
+        runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{child}", "snap_child")
+        runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{child}")

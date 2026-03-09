@@ -112,3 +112,22 @@ class TestReadTimeTravel:
         res_h, _ = runner.run_dual_cmd("-stat", "%b", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/stat_test.dat")
         # 期望块大小还是原来的量 (这里简化验证逻辑为 size 仍为 1024)
         assert "1024" in res_h.stdout
+
+    @pytest.mark.p2
+    def test_f9_05_tail_snapshot_file(self, runner):
+        """F9-05: tail 读取快照版本"""
+        path = f"{self.sandbox.test_dir}/tail_test.dat"
+        original_content = "LINE1\nLINE2\nLINE3\n"
+        create_test_file(runner, path, original_content)
+        self.sandbox.create_snapshot("s1")
+        
+        # 变异
+        host_tmp, container_tmp = create_local_tmp_file("APPENDED_LINE\n")
+        try:
+            runner.run_dual_cmd("-appendToFile", container_tmp, f"{{TARGET}}{path}")
+        finally:
+            cleanup_local_tmp(host_tmp)
+            
+        res_h, res_o = runner.run_dual_cmd("-tail", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/s1/tail_test.dat")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert res_h.stdout == original_content.strip()

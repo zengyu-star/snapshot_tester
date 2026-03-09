@@ -79,3 +79,47 @@ class TestRmMvInteraction:
         # 验证活跃目录中只有新文件名
         res_h2, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/old.dat")
         assert res_h2.returncode != 0, "活跃目录中旧文件名应已不存在"
+
+    @pytest.mark.p1
+    def test_f5_05_mv_external_to_snapshot_dir(self, runner):
+        """F5-05: 赋权 -> mv外部文件到快照目录 -> 快照A -> ls .snapshot/A -> 验证新文件在快照中可见"""
+        external_dir = "/external_tmp_f5_05"
+        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{external_dir}")
+        create_test_file(runner, f"{external_dir}/ext.dat", "EXTERNAL")
+        
+        # mv 入测试目录
+        runner.run_dual_cmd("-mv", f"{{TARGET}}{external_dir}/ext.dat", f"{{TARGET}}{self.sandbox.test_dir}/ext.dat")
+        
+        # 创建快照
+        self.sandbox.create_snapshot("snap_with_ext")
+        
+        # 验证可见
+        res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_with_ext/ext.dat")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert res_h.returncode == 0
+        
+        # 清理外部目录
+        runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{external_dir}")
+
+    @pytest.mark.p1
+    def test_f5_06_rm_r_parent_containing_snapshot(self, runner):
+        """F5-06: 赋权(子目录) -> 快照A -> 父目录 rm -r -> 拦截断言(不允许删除含快照的子目录)"""
+        parent_dir = f"{self.sandbox.test_dir}/p"
+        child_dir = f"{parent_dir}/c"
+        runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{child_dir}")
+        
+        # 对子目录开启快照并创建
+        runner.run_dual_admin_cmd("-allowSnapshot", f"{{TARGET}}{child_dir}")
+        runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{child_dir}", "s1")
+        
+        # 尝试删除父目录
+        res_h, res_o = runner.run_dual_cmd("-rm", "-r", f"{{TARGET}}{parent_dir}")
+        
+        # HDFS 应该拦截
+        assert res_h.returncode != 0
+        assert res_o.returncode != 0
+        ParityValidator.assert_results_match(res_h, res_o)
+        
+        # 清理子目录快照以便 teardown
+        runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{child_dir}", "s1")
+        runner.run_dual_admin_cmd("-disallowSnapshot", f"{{TARGET}}{child_dir}")
