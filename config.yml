@@ -8,14 +8,22 @@ global:
   max_workers: 10
   global_timeout_sec: 7200
   dry_run: false
-  mock_obsa_mode: true  # 新增: 无OBSA插件时开启，将OBS请求打向本地HDFS的另一个沙箱目录
+  mock_obsa_mode: true  # 实测模式
 
 cluster_env:
-  hadoop_namenode: "hdfs://namenode:8020"
-  test_base_path: "/test/obsa_test_workspace"
-  obsa_cli_path: "/opt/huawei/obsa/bin/obsa"
-  obs_bucket: "internal-test-bucket-01"
-  obs_endpoint: "obs.cn-internal-1.company.local"
+  # HDFS 侧基准路径 (纯 HDFS 侧，用于对照组)
+  hdfs_base_uri: "hdfs://namenode:8020/native_obsa_test"
+  
+  # OBS 侧数据路径 (原生协议，供 createSnapshot / put 等使用)
+  # 对应 core-site.xml 里的真实桶
+  obs_base_uri: "obs://posix-obsa-snap/obsa/obsa_test_workspace"
+  
+  # OBS 侧管理路径 (HDFS 协议，供 allowSnapshot 使用)
+  # 对应 core-site.xml: hdfs://localhost:9000/hadoop -> obs://posix-obsa-snap/obsa
+  obs_admin_uri: "hdfs://namenode:8020/hadoop/obsa_test_workspace"
+  
+  obsa_cli_path: "hdfs"
+  obs_endpoint: "obs.bcm-region.myhuaweicloud.com"
 
 data_model:
   file_size_kb: 1024

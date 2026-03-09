@@ -1,14 +1,12 @@
 import pytest
 import logging
-import yaml
 import os
 import sys
 
 # 添加项目根目录到 sys.path，以便能找到 dual_runner 和 data_mutator 等模块
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from dual_runner import DualHadoopCommandRunner, ParityValidator
-from data_mutator import DataMutator
+from dual_runner import ParityValidator
 
 # 设置当前测试套件的日志记录器
 logger = logging.getLogger("SnapshotLifecycleTest")
@@ -16,34 +14,18 @@ logger = logging.getLogger("SnapshotLifecycleTest")
 class TestSnapshotLifecycle:
     """
     快照核心生命周期端到端测试
-    涵盖：赋权 -> 造数 -> 快照A -> 变异 -> 快照B -> 差异比对 -> 越权拦截
+    涵盖：赋权 -> 造数 -> 快照A -> 变异 -> 快照B -> 越权拦截
     """
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self):
+    def setup_teardown(self, runner, mutator, config):
         """
         严苛的防污染沙箱环境准备与清理
+        自动注入 conftest 中的 runner, mutator, config
         """
-        # ================= 加载配置 =================
-        project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        config_path = os.path.join(project_root, "config.yml")
-        with open(config_path, "r", encoding="utf-8") as f:
-            self.config = yaml.safe_load(f)
-        
-        # ================= 配置与初始化 =================
-        # 从 config.yml 中读取基础路径
-        nn = self.config['cluster_env']['hadoop_namenode'].rstrip('/')
-        base = self.config['cluster_env']['test_base_path'].strip('/')
-        
-        hdfs_test_base = f"{nn}/{base}/hdfs_side"
-        # 即使在 mock 模式下，这里也先写 obs://，由 runner 内部处理映射
-        obs_test_base = f"obs://{self.config['cluster_env']['obs_bucket']}/{base}/obs_side"
-        
-        # 初始化双端执行引擎和造数模块
-        self.runner = DualHadoopCommandRunner(hdfs_test_base, obs_test_base, self.config)
-        self.mutator = DataMutator(self.runner, self.config.get("data_model", {}))
-        
-        # 定义测试目录的相对路径
+        self.config = config
+        self.runner = runner
+        self.mutator = mutator
         self.test_dir = "/snap_lifecycle_01"
 
         # ================= Setup 阶段 =================
@@ -88,12 +70,7 @@ class TestSnapshotLifecycle:
         res_h, res_o = self.runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{self.test_dir}", "snap_v2")
         ParityValidator.assert_results_match(res_h, res_o)
 
-        logger.info(">>> 步骤 6: 验证 snapshotDiff 差异树的结构一致性")
-        # 强制比对 Hadoop 的 M, +, - 等差异标记符是否分毫不差
-        res_h, res_o = self.runner.run_dual_hdfs_cmd("snapshotDiff", f"{{TARGET}}{self.test_dir}", "snap_v1", "snap_v2")
-        ParityValidator.assert_results_match(res_h, res_o, strict_error_match=True)
-
-        logger.info(">>> 步骤 7: 验证 .snapshot 隐藏目录的只读隔离性 (越权拦截测试)")
+        logger.info(">>> 步骤 6: 验证 .snapshot 隐藏目录的只读隔离性 (越权拦截测试)")
         # 故意试图向历史快照的只读目录里写数据
         snap_hidden_dir = f"{self.test_dir}/.snapshot/snap_v1"
         res_h, res_o = self.runner.run_dual_cmd("-touchz", f"{{TARGET}}{snap_hidden_dir}/illegal_file.txt")

@@ -64,14 +64,18 @@ class TestRmMvInteraction:
         assert res_h.returncode == 0
 
     @pytest.mark.p1
-    def test_f5_04_mv_rename_diff_r(self, runner):
-        """F5-04: mv 目录内重命名产生 R 标记"""
+    def test_f5_04_mv_rename_snapshot_preserves_old(self, runner):
+        """F5-04: mv 重命名后，快照中仍保留旧文件名"""
         create_test_file(runner, f"{self.sandbox.test_dir}/old.dat")
         self.sandbox.create_snapshot("snap_v1")
         
         runner.run_dual_cmd("-mv", f"{{TARGET}}{self.sandbox.test_dir}/old.dat", f"{{TARGET}}{self.sandbox.test_dir}/new.dat")
-        self.sandbox.create_snapshot("snap_v2")
         
-        res_h, _ = runner.run_dual_hdfs_cmd("snapshotDiff", f"{{TARGET}}{self.sandbox.test_dir}", "snap_v1", "snap_v2")
-        # 有些 HDFS 环境可能表现为 + 和 -，所以兼容判断
-        assert "R" in res_h.stdout or ("+" in res_h.stdout and "-" in res_h.stdout)
+        # 验证快照中旧文件名仍然存在
+        res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/old.dat")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert res_h.returncode == 0, "快照中应保留重命名前的旧文件"
+        
+        # 验证活跃目录中只有新文件名
+        res_h2, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/old.dat")
+        assert res_h2.returncode != 0, "活跃目录中旧文件名应已不存在"

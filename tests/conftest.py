@@ -14,6 +14,28 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from dual_runner import DualHadoopCommandRunner
 from data_mutator import DataMutator
 
+class ObsaAwareDualRunner(DualHadoopCommandRunner):
+    """
+    OBSA 感知路由代理：
+    拦截管理类命令，强制 OBS 侧使用 hdfs:// 挂载点协议；常规命令保持 obs:// 不变。
+    """
+    def __init__(self, hdfs_base, obs_base, obs_admin_base, config):
+        super().__init__(hdfs_base, obs_base, config)
+        self.obs_admin_base = obs_admin_base
+
+    def run_dual_admin_cmd(self, action: str, *args):
+        hdfs_cmd = self.admin_cli + [action]
+        obs_cmd = self.admin_cli + [action]
+        for arg in args:
+            if "{TARGET}" in arg:
+                hdfs_cmd.append(arg.replace("{TARGET}", self.hdfs_base))
+                # 【核心修改】管理员命令目标替换为挂载点路由 (hdfs://)
+                obs_cmd.append(arg.replace("{TARGET}", self.obs_admin_base))
+            else:
+                hdfs_cmd.append(arg)
+                obs_cmd.append(arg)
+        return self._execute(hdfs_cmd, "hdfs"), self._execute(obs_cmd, "obs")
+
 
 @pytest.fixture(scope="session")
 def config():
@@ -26,12 +48,17 @@ def config():
 
 @pytest.fixture(scope="session")
 def runner(config):
-    """创建双端执行引擎（整个测试会话共享）"""
-    nn = config['cluster_env']['hadoop_namenode'].rstrip('/')
-    base = config['cluster_env']['test_base_path'].strip('/')
-    hdfs_test_base = f"{nn}/{base}/hdfs_side"
-    obs_test_base = f"obs://{config['cluster_env']['obs_bucket']}/{base}/obs_side"
-    return DualHadoopCommandRunner(hdfs_test_base, obs_test_base, config)
+    """创建智能双端执行引擎（整个测试会话共享）"""
+    hdfs_base = config['cluster_env']['hdfs_base_uri'].rstrip('/') + "/hdfs_side"
+    obs_base = config['cluster_env']['obs_base_uri'].rstrip('/') + "/obs_side"
+    obs_admin_base = config['cluster_env']['obs_admin_uri'].rstrip('/') + "/obs_side"
+    
+    r = ObsaAwareDualRunner(hdfs_base, obs_base, obs_admin_base, config)
+    # Mock 模式下不存在真实 OBS 桶，admin 路径必须与 mock 转换后的 data 路径一致，
+    # 否则 allowSnapshot 和 createSnapshot 会作用在不同的 HDFS 目录上。
+    if r.mock_mode:
+        r.obs_admin_base = r.obs_base
+    return r
 
 
 @pytest.fixture(scope="session")
@@ -50,7 +77,6 @@ def pytest_runtest_logreport(report):
     将每个用例的最终执行结果 (PASSED/FAILED) 写入日志文件
     """
     yield
-    # 我们只关心 call 阶段（用例正文执行阶段）的结果
     if report.when == "call":
         status = report.outcome.upper()
         nodeid = report.nodeid

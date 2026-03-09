@@ -89,8 +89,14 @@ pytest -m p1 -v
 # C. 执行全量 P2 高级/场景化用例
 pytest -m p2 -v
 
-# D. 生成可视化 HTML 报表 (推荐)
+# D. 执行具有p1标签的用例，并且生成可视化 HTML 报表 (推荐)
 pytest -m p1 --html=report.html --self-contained-html
+
+# E. 执行指定的测试文件
+pytest tests/test_f10_queries.py -v
+
+# F. 执行特定测试文件中，标签为p0的测试用例
+pytest tests/test_f1_lifecycle.py -m p0 -v
 ```
 
 ### 2. 日志追踪

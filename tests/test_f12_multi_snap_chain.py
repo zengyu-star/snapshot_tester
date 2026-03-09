@@ -24,41 +24,50 @@ class TestMultiSnapChain:
         yield
         self.sandbox.teardown()
 
-    def test_f12_01_diff_accumulation(self, runner):
-        """F12-01: 三快照差异链的累积正确性"""
+    def test_f12_01_snapshot_chain_isolation(self, runner):
+        """F12-01: 三快照链各自保留对应时间点的文件快照"""
         create_test_file(runner, f"{self.sandbox.test_dir}/base.txt", "V0")
         self.sandbox.create_snapshot("A")
         
-        # 变异 1
+        # 变异 1：新增 file_B
         create_test_file(runner, f"{self.sandbox.test_dir}/file_B.txt", "V1")
         self.sandbox.create_snapshot("B")
         
-        # 变异 2
+        # 变异 2：新增 file_C
         create_test_file(runner, f"{self.sandbox.test_dir}/file_C.txt", "V2")
         self.sandbox.create_snapshot("C")
         
-        # 验证 A->B 有 file_B
-        res_ab, _ = runner.run_dual_hdfs_cmd("snapshotDiff", f"{{TARGET}}{self.sandbox.test_dir}", "A", "B")
-        assert "file_B.txt" in res_ab.stdout
-        assert "file_C.txt" not in res_ab.stdout
+        # 验证快照 A 中只有 base.txt，不含 file_B 和 file_C
+        res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/A/")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert "base.txt" in res_h.stdout
+        assert "file_B.txt" not in res_h.stdout
+        assert "file_C.txt" not in res_h.stdout
         
-        # 验证 B->C 有 file_C
-        res_bc, _ = runner.run_dual_hdfs_cmd("snapshotDiff", f"{{TARGET}}{self.sandbox.test_dir}", "B", "C")
-        assert "file_C.txt" in res_bc.stdout
-        assert "file_B.txt" not in res_bc.stdout
+        # 验证快照 B 中有 base.txt 和 file_B.txt，不含 file_C
+        res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/B/")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert "base.txt" in res_h.stdout
+        assert "file_B.txt" in res_h.stdout
+        assert "file_C.txt" not in res_h.stdout
         
-        # 验证 A->C 有两者
-        res_ac, _ = runner.run_dual_hdfs_cmd("snapshotDiff", f"{{TARGET}}{self.sandbox.test_dir}", "A", "C")
-        assert "file_B.txt" in res_ac.stdout
-        assert "file_C.txt" in res_ac.stdout
+        # 验证快照 C 中三个文件都存在
+        res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/C/")
+        ParityValidator.assert_results_match(res_h, res_o)
+        assert "base.txt" in res_h.stdout
+        assert "file_B.txt" in res_h.stdout
+        assert "file_C.txt" in res_h.stdout
 
     def test_f12_02_delete_middle_does_not_break_chain(self, runner):
-        """F12-02: 删除历史快照不影响后续快照 diff"""
+        """F12-02: 删除历史快照不影响后续快照的可用性"""
         self.sandbox.create_snapshot("S1")
         create_test_file(runner, f"{self.sandbox.test_dir}/f1")
         self.sandbox.create_snapshot("S2")
         
         self.sandbox.delete_snapshot("S1")
         
-        res_h, res_o = runner.run_dual_hdfs_cmd("snapshotDiff", f"{{TARGET}}{self.sandbox.test_dir}", "S2", ".")
+        # 验证 S2 快照仍然可用且内容完整
+        res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/S2/")
         ParityValidator.assert_results_match(res_h, res_o)
+        assert res_h.returncode == 0, "删除 S1 后，S2 快照应仍然可用"
+        assert "f1" in res_h.stdout, "S2 快照中应包含 f1 文件"
