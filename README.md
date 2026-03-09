@@ -80,7 +80,7 @@ source venv/bin/activate
 ### 1. 执行命令示例
 
 ```bash
-# A. 执行最核心的 P0 用例 (快速冒烟)
+# A. 执行最核心的 P0 用例 (快速冒烟)，通过-m可以指定用例标签
 pytest -m p0 -v
 
 # B. 执行 P1 级验证用例
@@ -89,13 +89,16 @@ pytest -m p1 -v
 # C. 执行全量 P2 高级/场景化用例
 pytest -m p2 -v
 
-# D. 执行具有p1标签的用例，并且生成可视化 HTML 报表 (推荐)
+# D. 执行所有用例，并且生成可视化 HTML 报表 
+pytest -v --html=report.html --self-contained-html
+
+# E. 执行具有p1标签的用例，并且生成可视化 HTML 报表
 pytest -m p1 --html=report.html --self-contained-html
 
-# E. 执行指定的测试文件
+# F. 执行指定的测试文件
 pytest tests/test_f10_queries.py -v
 
-# F. 执行特定测试文件中，标签为p0的测试用例
+# G. 执行特定测试文件中，标签为p0的测试用例 
 pytest tests/test_f1_lifecycle.py -m p0 -v
 ```
 
