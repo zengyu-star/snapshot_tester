@@ -72,7 +72,6 @@ source venv/bin/activate
 - **命名规范**：`test_f{章节}_{功能点}.py`
 - **核心用例库**：
     - `test_f1_lifecycle.py`: 快照全生命周期主流程 (P0)
-    - `test_f2_snapshot_diff.py`: `snapshotDiff` 差异标记 (+/-/M/R) 深度验证 (P0)
     - `test_f11_readonly_block.py`: `.snapshot` 隐藏目录全指令写拦截验证 (P0)
     - `test_f12_multi_snap_chain.py`: 多快照时序链与删除中间态验证 (P2)
     - `...`: 涵盖权限、副本、深层嵌套等 F1-F14 全场景。
@@ -108,34 +107,16 @@ pytest tests/test_f1_lifecycle.py -m p0 -v
 
 ---
 
-## 🔍 六、 核心工作流：SnapshotDiff 验证
 
-本框架最强大的功能之一是验证差异报告的一致性。测试会验证以下标记的字节级对齐：
-
-- **`+` (Added)**: 活跃目录新增的文件/目录。
-- **`-` (Deleted)**: 活跃目录中被删除但快照中仍存的文件/目录。
-- **`M` (Modified)**: 内容发生变更、Metadata 变化或执行过 `truncate`。
-- **`R` (Renamed)**: 同目录下发生的移动/重命名行为。
-
----
-
-## 🛠️ 七、 常见问题排查 (Troubleshooting)
+## 🛠️ 六、 常见问题排查 (Troubleshooting)
 
 ### 1. Docker 环境下 appendToFile 报错
 **现象**：`java.io.IOException: Failed to replace a bad datanode...`
 **原因**：在单 DataNode 的 Mock/Docker 环境中，HDFS 默认流水线策略导致追加写入失败。
 **解决**：本框架已自动注入 `replace-datanode-on-failure.enable=false` 配置。
 
-### 2. snapshotDiff 命令不可用
-**提示**：`-snapshotDiff: Unknown command`
-**原因**：`snapshotDiff` 是 `hdfs` 的顶层命令，而非 `dfs` 的子命令。
-- 正确：`hdfs snapshotDiff <path> <v1> <v2>`
-- 错误：`hdfs dfs -snapshotDiff ...`
-**解决**: 框架底层 `dual_runner.py` 已自动处理此差异。
 
----
-
-## 📝 八、 开发与扩展
+## 📝 七、 开发与扩展
 
 若需新增测试用例，请参考 `tests/test_helpers.py`：
 - 使用 `SnapshotSandbox` 管理沙箱环境。
