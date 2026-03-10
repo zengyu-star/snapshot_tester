@@ -108,7 +108,8 @@ class ParityValidator:
     UNSUPPORTED_OBSA_FEATURES = [
         "setfacl", "getfacl", "setfattr", "getfattr", 
         "concat", "ln", "setSpaceQuota", "clrSpaceQuota", 
-        "setQuota", "clrQuota", "setStoragePolicy"
+        "setQuota", "clrQuota", "setStoragePolicy",
+        "expunge", "moveToLocal", "fsck"
     ]
 
     def __init__(self, is_mock_mode: bool = False):
