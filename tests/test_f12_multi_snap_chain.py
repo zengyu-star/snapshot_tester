@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file, create_local_tmp_file, cleanup_local_tmp
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestMultiSnapChain")
 
@@ -16,8 +16,9 @@ class TestMultiSnapChain:
     """F12: 多快照时序与交叉操作"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f12_chain_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -39,21 +40,21 @@ class TestMultiSnapChain:
         
         # 验证快照 A 中只有 base.txt，不含 file_B 和 file_C
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/A/")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert "base.txt" in res_h.stdout
         assert "file_B.txt" not in res_h.stdout
         assert "file_C.txt" not in res_h.stdout
         
         # 验证快照 B 中有 base.txt 和 file_B.txt，不含 file_C
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/B/")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert "base.txt" in res_h.stdout
         assert "file_B.txt" in res_h.stdout
         assert "file_C.txt" not in res_h.stdout
         
         # 验证快照 C 中三个文件都存在
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/C/")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert "base.txt" in res_h.stdout
         assert "file_B.txt" in res_h.stdout
         assert "file_C.txt" in res_h.stdout
@@ -68,6 +69,6 @@ class TestMultiSnapChain:
         
         # 验证 S2 快照仍然可用且内容完整
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/S2/")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.returncode == 0, "删除 S1 后，S2 快照应仍然可用"
         assert "f1" in res_h.stdout, "S2 快照中应包含 f1 文件"

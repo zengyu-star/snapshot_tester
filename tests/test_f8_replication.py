@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestReplicationInteraction")
 
@@ -16,8 +16,9 @@ class TestReplicationInteraction:
     """快照 × 副本数命令交互 (F8-01 ~ F8-02)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f8_rep_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -44,4 +45,4 @@ class TestReplicationInteraction:
         res_h, res_o = runner.run_dual_cmd("-setrep", "2", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/no_rep.dat")
         assert res_h.returncode != 0
         assert res_o.returncode != 0
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)

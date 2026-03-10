@@ -11,7 +11,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from dual_runner import DualHadoopCommandRunner
+from dual_runner import DualHadoopCommandRunner, ParityValidator
 from data_mutator import DataMutator
 
 class ObsaAwareDualRunner(DualHadoopCommandRunner):
@@ -22,7 +22,6 @@ class ObsaAwareDualRunner(DualHadoopCommandRunner):
     def __init__(self, hdfs_base, obs_base, obs_admin_base, config):
         super().__init__(hdfs_base, obs_base, config)
         self.obs_admin_base = obs_admin_base
-
     def run_dual_admin_cmd(self, action: str, *args):
         hdfs_cmd = self.admin_cli + [action]
         obs_cmd = self.admin_cli + [action]
@@ -59,6 +58,12 @@ def runner(config):
     if r.mock_mode:
         r.obs_admin_base = r.obs_base
     return r
+
+
+@pytest.fixture(scope="session")
+def validator(runner):
+    """创建结果校准器，感知 mock 模式"""
+    return ParityValidator(is_mock_mode=runner.mock_mode)
 
 
 @pytest.fixture(scope="session")

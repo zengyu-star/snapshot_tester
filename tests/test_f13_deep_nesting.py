@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestDeepNesting")
 
@@ -16,8 +16,9 @@ class TestDeepNesting:
     """F13: 深层嵌套路径下的快照鲁棒性"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f13_deep_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -35,7 +36,7 @@ class TestDeepNesting:
         runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{deep_path}", "snap_deep")
         
         res_h, res_o = runner.run_dual_cmd("-cat", f"{{TARGET}}{deep_path}/.snapshot/snap_deep/leaf.txt")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     def test_f13_02_multiple_subdirs_independent_mutations(self, runner):
         """F13-02: 多个子目录各自创建快照后的独立性"""
@@ -104,7 +105,7 @@ class TestDeepNesting:
         res_h, res_o = runner.run_dual_cmd("-count", f"{{TARGET}}{snap_wide_dir}")
         # 强加一个状态码断言，防止底层默默报错被 Parity 误放行
         assert res_h.returncode == 0, f"Count 失败: {res_h.stderr}"
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         
         # 检查一个具体文件
         res_file, _ = runner.run_dual_cmd("-cat", f"{{TARGET}}{snap_wide_dir}/file_10.txt")

@@ -9,7 +9,7 @@ import logging
 import os
 
 from test_helpers import SnapshotSandbox, create_test_file, create_local_tmp_file, cleanup_local_tmp
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestWriteIsolation")
 
@@ -19,8 +19,9 @@ class TestWriteIsolation:
     """快照 × 写入命令隔离性 (F3-01, F3-02, F3-03, F3-05)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f3_write_iso_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -39,7 +40,7 @@ class TestWriteIsolation:
         res_h, res_o = runner.run_dual_cmd(
             "-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
         # 新文件不应出现在快照中
         assert "new_after_snap.dat" not in res_h.stdout, \
@@ -57,7 +58,7 @@ class TestWriteIsolation:
         res_h, res_o = runner.run_dual_cmd(
             "-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
         assert "touched_file.dat" not in res_h.stdout, \
             f"touchz 后的文件不应出现在快照中: {res_h.stdout}"
@@ -76,7 +77,7 @@ class TestWriteIsolation:
         res_h, res_o = runner.run_dual_cmd(
             "-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/overwrite_me.dat"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert original_content in res_h.stdout, \
             f"快照中的文件应保持原始内容，实际: {res_h.stdout}"
 
@@ -103,7 +104,7 @@ class TestWriteIsolation:
         res_h, res_o = runner.run_dual_cmd(
             "-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/append_me.dat"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.stdout == original_content, \
             f"快照中文件应只包含原始内容 '{original_content}'，实际: '{res_h.stdout}'"
 
@@ -145,5 +146,5 @@ class TestWriteIsolation:
         runner.run_dual_cmd("-rm", f"{{TARGET}}{self.sandbox.test_dir}/rm_test.dat")
         
         res_h, res_o = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/rm_test.dat")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.stdout == "ORIG"

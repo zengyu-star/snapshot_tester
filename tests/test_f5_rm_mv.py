@@ -8,7 +8,7 @@ import pytest
 import logging
 
 from test_helpers import SnapshotSandbox, create_test_file
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestRmMvInteraction")
 
@@ -18,8 +18,9 @@ class TestRmMvInteraction:
     """快照 × rm/mv 命令交互 (F5-01)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f5_rm_mv_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -46,7 +47,7 @@ class TestRmMvInteraction:
         res_h, res_o = runner.run_dual_cmd(
             "-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/will_be_deleted.dat"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.returncode == 0, f"快照中的文件应可读: {res_h.stderr}"
         assert original_content in res_h.stdout, \
             f"快照中的文件内容应为原始值 '{original_content}'，实际: '{res_h.stdout}'"
@@ -73,7 +74,7 @@ class TestRmMvInteraction:
         
         # 验证快照中旧文件名仍然存在
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/old.dat")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.returncode == 0, "快照中应保留重命名前的旧文件"
         
         # 验证活跃目录中只有新文件名
@@ -95,7 +96,7 @@ class TestRmMvInteraction:
         
         # 验证可见
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_with_ext/ext.dat")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.returncode == 0
         
         # 清理外部目录
@@ -128,7 +129,7 @@ class TestRmMvInteraction:
             # HDFS 应该拦截
             assert res_h.returncode != 0, "HDFS should block deleting parent of a snapshot"
             assert res_o.returncode != 0, "OBS should block deleting parent of a snapshot"
-            ParityValidator.assert_results_match(res_h, res_o)
+            self.validator.assert_results_match(res_h, res_o)
         finally:
             # 强制清理快照以便后续删除
             runner.run_dual_cmd("-deleteSnapshot", f"{{TARGET}}{child_dir}", "s1")

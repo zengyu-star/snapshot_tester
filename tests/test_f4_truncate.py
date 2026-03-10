@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file, create_test_file_with_size
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestTruncateInteraction")
 
@@ -15,8 +15,9 @@ class TestTruncateInteraction:
     """快照 × truncate 命令交互 (F4-01 ~ F4-08)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f4_truncate_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -33,7 +34,7 @@ class TestTruncateInteraction:
 
         # 验证快照中文件大小仍为原始 1024 字节
         res_h, res_o = runner.run_dual_cmd("-du", "-s", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/trunc_small.dat")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert "1024" in res_h.stdout, f"快照中的文件应保持原始大小，实际: {res_h.stdout}"
 
     @pytest.mark.p1
@@ -46,7 +47,7 @@ class TestTruncateInteraction:
         runner.run_dual_cmd("-truncate", "-w", "0", f"{{TARGET}}{self.sandbox.test_dir}/trunc_zero.dat")
 
         res_h, res_o = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/trunc_zero.dat")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.stdout == content
 
     @pytest.mark.p1
@@ -58,7 +59,7 @@ class TestTruncateInteraction:
         res_h, res_o = runner.run_dual_cmd("-truncate", "-w", "0", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/no_touch.dat")
         assert res_h.returncode != 0
         assert res_o.returncode != 0
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     @pytest.mark.p1
     def test_f4_05_truncate_larger_parity(self, runner):
@@ -68,7 +69,7 @@ class TestTruncateInteraction:
         self.sandbox.create_snapshot("snap_v1")
 
         res_h, res_o = runner.run_dual_cmd("-truncate", "-w", "1024", f"{{TARGET}}{self.sandbox.test_dir}/trunc_large.dat")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     @pytest.mark.p1
     def test_f4_06_truncate_larger_snapshot_content_preserved(self, runner):

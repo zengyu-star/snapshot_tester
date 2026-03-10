@@ -104,23 +104,53 @@ class DualHadoopCommandRunner:
         return self._execute(hdfs_cmd, "hdfs"), self._execute(obs_cmd, "obs")
 
 class ParityValidator:
-    @staticmethod
-    def assert_results_match(hdfs_res: CmdResult, obs_res: CmdResult, strict_error_match: bool = False):
+    # OBSA 官方明确不支持的功能特性
+    UNSUPPORTED_OBSA_FEATURES = [
+        "setfacl", "getfacl", "setfattr", "getfattr", 
+        "concat", "ln", "setSpaceQuota", "clrSpaceQuota", 
+        "setQuota", "clrQuota", "setStoragePolicy"
+    ]
+
+    def __init__(self, is_mock_mode: bool = False):
+        self.is_mock_mode = is_mock_mode
+
+    def assert_results_match(self, hdfs_res: CmdResult, obs_res: CmdResult, feature_tag: str = None, strict_error_match: bool = False):
+        """
+        比对 HDFS 和 OBSA 的执行结果。
+        如果 feature_tag 在不支持列表中且处于非 Mock 模式，则验证 OBSA 是否正确拦截（返回非 0）。
+        """
+        # 1. 处理已知不支持的特性逻辑 (仅在非 Mock 模式下生效)
+        if not self.is_mock_mode and feature_tag in self.UNSUPPORTED_OBSA_FEATURES:
+            logger.info(f"检测到已知不支持特性: {feature_tag}，切换为拦截验证模式。")
+            if obs_res.returncode == 0:
+                error_msg = f"严重：OBSA 静默通过了不支持的特性 {feature_tag}！这可能导致元数据不一致。"
+                logger.error(error_msg)
+                raise AssertionError(error_msg)
+            
+            # 对于不支持的特性，我们不强求 stderr 完全一致，只要 OBSA 报错即可
+            # 但 HDFS 侧通常是成功的（因为 HDFS 支持），所以 returncode 肯定不一致，这里提前返回
+            logger.info(f"OBSA 已正确拦截不支持的特性 {feature_tag} (code={obs_res.returncode})。")
+            return
+
+        # 2. 标准一致性检查
         if hdfs_res.returncode != obs_res.returncode:
             error_msg = (
-                f"状态码不一致! \nHDFS 返回: {hdfs_res.returncode} | OBSA 返回: {obs_res.returncode}\n"
+                f"状态码不一致! [Feature: {feature_tag}]\n"
+                f"HDFS 返回: {hdfs_res.returncode} | OBSA 返回: {obs_res.returncode}\n"
                 f"HDFS Stdout: {hdfs_res.stdout} | OBSA Stdout: {obs_res.stdout}\n"
                 f"HDFS Stderr: {hdfs_res.stderr} | OBSA Stderr: {obs_res.stderr}"
             )
             logger.error(error_msg)
             raise AssertionError(error_msg)
 
+        # 路径替换逻辑，用于消除 Stdout 中的绝对路径差异
         cleaned_hdfs_stdout = hdfs_res.stdout.replace(hdfs_res.command.split()[-1], "TARGET_PATH")
         cleaned_obs_stdout = obs_res.stdout.replace(obs_res.command.split()[-1], "TARGET_PATH")
         
         if cleaned_hdfs_stdout != cleaned_obs_stdout:
-            logger.warning("发现 Stdout 差异，可能是路径前缀导致，请人工 Review。")
+            logger.warning(f"发现 Stdout 差异 [Feature: {feature_tag}]，可能是路径前缀导致，请人工 Review。")
 
         if strict_error_match and hdfs_res.returncode != 0:
+            # 在某些高危场景，不仅要求返回码一致，还要求异常类型一致
             if "SnapshotException" in hdfs_res.stderr and "SnapshotException" not in obs_res.stderr:
-                raise AssertionError("OBSA 插件未抛出预期异常！")
+                raise AssertionError(f"OBSA 插件未抛出预期的 SnapshotException！Stderr: {obs_res.stderr}")

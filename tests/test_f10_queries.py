@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestQueryInteractions")
 
@@ -16,8 +16,9 @@ class TestQueryInteractions:
     """F10: 快照 × 信息查询交互 (ls / count / du)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f10_query_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -33,7 +34,7 @@ class TestQueryInteractions:
         runner.run_dual_cmd("-rm", f"{{TARGET}}{self.sandbox.test_dir}/file1.txt")
         
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert "file1.txt" in res_h.stdout
         assert "file2.txt" in res_h.stdout
 
@@ -58,7 +59,7 @@ class TestQueryInteractions:
         runner.run_dual_cmd("-rm", f"{{TARGET}}{self.sandbox.test_dir}/size_file")
         
         res_h, res_o = runner.run_dual_cmd("-du", "-s", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert "100" in res_h.stdout
 
     def test_f10_04_ls_all_snapshots(self, runner):
@@ -67,6 +68,6 @@ class TestQueryInteractions:
         self.sandbox.create_snapshot("S2")
         
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert "S1" in res_h.stdout
         assert "S2" in res_h.stdout

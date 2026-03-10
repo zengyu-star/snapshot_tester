@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestPermissionsIsolation")
 
@@ -16,8 +16,9 @@ class TestPermissionsIsolation:
     """快照 × 权限命令隔离性 (F7-01 ~ F7-05)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f7_perm_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -59,7 +60,7 @@ class TestPermissionsIsolation:
         res_h, res_o = runner.run_dual_cmd("-chmod", "777", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/no_chmod.dat")
         assert res_h.returncode != 0
         assert res_o.returncode != 0
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     def test_f7_04_chown_snapshot_forbidden(self, runner):
         """F7-04: 禁止对快照路径执行 chown"""
@@ -69,7 +70,7 @@ class TestPermissionsIsolation:
         res_h, res_o = runner.run_dual_cmd("-chown", "bin", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/no_chown.dat")
         assert res_h.returncode != 0
         assert res_o.returncode != 0
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     def test_f7_05_chgrp_isolation(self, runner):
         """F7-05: chgrp 不影响快照中文件 group"""

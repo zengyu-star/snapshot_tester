@@ -8,7 +8,7 @@ import pytest
 import logging
 
 from test_helpers import SnapshotSandbox, create_test_file, create_local_tmp_file, cleanup_local_tmp, create_test_file_with_size
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestReadTimeTravel")
 
@@ -18,8 +18,9 @@ class TestReadTimeTravel:
     """快照 × 只读命令时间旅行 (F9-01)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f9_read_tt_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -54,7 +55,7 @@ class TestReadTimeTravel:
         res_h, res_o = runner.run_dual_cmd(
             "-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/time_travel.dat"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.stdout == original_content, \
             f"快照时间旅行: 期望 '{original_content}'，实际 '{res_h.stdout}'"
         assert "_MUTATION_APPENDED" not in res_h.stdout, \
@@ -73,7 +74,7 @@ class TestReadTimeTravel:
         # 在 Docker 场景下直接验证本地文件不可靠，改用校验 cat 结果 + get 返回码
         local_dest = "/tmp/f9_02_downloaded.dat"
         res_h, res_o = runner.run_dual_cmd("-get", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/get_test.dat", local_dest)
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         
         # 补充 cat 验证确保内容确实一致
         cat_h, _ = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/get_test.dat")
@@ -135,5 +136,5 @@ class TestReadTimeTravel:
             cleanup_local_tmp(host_tmp)
             
         res_h, res_o = runner.run_dual_cmd("-tail", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/s1/tail_test.dat")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         assert res_h.stdout == original_content.strip()

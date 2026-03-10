@@ -10,7 +10,7 @@ import logging
 import os
 
 from test_helpers import SnapshotSandbox, create_test_file, create_local_tmp_file, cleanup_local_tmp
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestReadonlyBlock")
 
@@ -20,8 +20,9 @@ class TestReadonlyIsolation:
     """只读隔离性 —— .snapshot 写操作全拦截 (F11-01 ~ F11-08)"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f11_readonly_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()

@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestRootOps")
 
@@ -16,8 +16,9 @@ class TestRootOps:
     """F14: 快照根目录特权与操作限制"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f14_root_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -28,7 +29,7 @@ class TestRootOps:
         """F14-01: ls 快照根目录一致性"""
         self.sandbox.create_snapshot("s1")
         res_h, res_o = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot")
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     def test_f14_02_snapshot_path_as_source_for_put_fails(self, runner):
         """F14-02: 禁止将快照路径作为 put 的目标(只读)"""
@@ -37,7 +38,7 @@ class TestRootOps:
         res_h, res_o = runner.run_dual_cmd("-touchz", f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/s1/illegal")
         assert res_h.returncode != 0
         assert res_o.returncode != 0
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     def test_f14_03_nested_snapshotable_dirs_independence(self, runner):
         """F14-03: 验证多个 snapshottable 目录的快照独立性"""

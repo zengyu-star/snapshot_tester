@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from test_helpers import SnapshotSandbox, create_test_file
-from dual_runner import ParityValidator
+
 
 logger = logging.getLogger("TestRecoveryCP")
 
@@ -16,8 +16,9 @@ class TestRecoveryCP:
     """F6: 快照 × cp 命令交互（含快照恢复）"""
 
     @pytest.fixture(autouse=True)
-    def setup_teardown(self, runner):
+    def setup_teardown(self, runner, validator):
         self.runner = runner
+        self.validator = validator
         self.sandbox = SnapshotSandbox(runner, "f6_recovery_test")
         self.sandbox.setup()
         self.sandbox.allow_snapshot()
@@ -37,7 +38,7 @@ class TestRecoveryCP:
             f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_v1/file.dat", 
             f"{{TARGET}}{self.sandbox.test_dir}/file_recovered.dat"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         
         # 校验恢复后的内容
         ls_h, _ = runner.run_dual_cmd("-cat", f"{{TARGET}}{self.sandbox.test_dir}/file_recovered.dat")
@@ -56,7 +57,7 @@ class TestRecoveryCP:
             f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/snap_tree/sub",
             f"{{TARGET}}{self.sandbox.test_dir}/sub_recovered"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         
         # 验证恢复成功
         res_ls, _ = runner.run_dual_cmd("-ls", f"{{TARGET}}{self.sandbox.test_dir}/sub_recovered/inner/f1.txt")
@@ -88,7 +89,7 @@ class TestRecoveryCP:
         )
         assert res_h.returncode != 0
         assert res_o.returncode != 0
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
 
     def test_f6_05_cp_from_snapshot_to_outside(self, runner):
         """F6-05: 从快照拷贝到外部路径"""
@@ -103,7 +104,7 @@ class TestRecoveryCP:
             f"{{TARGET}}{self.sandbox.test_dir}/.snapshot/s1/out.dat",
             f"{{TARGET}}{external_path}"
         )
-        ParityValidator.assert_results_match(res_h, res_o)
+        self.validator.assert_results_match(res_h, res_o)
         
         # 验证外部文件
         cat_h, _ = runner.run_dual_cmd("-cat", f"{{TARGET}}{external_path}")
