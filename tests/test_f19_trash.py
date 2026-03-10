@@ -50,7 +50,9 @@ class TestTrashInteraction:
         OBSA 通常不支持 expunge（因为可能没有 HDFS 风格的回收站管理）。
         """
         # expunge 是 dfs 级命令，但在 HDFS 中可能需要定期或者手动执行
-        res_h, res_o = self.runner.run_dual_cmd("-expunge")
+        # 使用 -fs 显式指定目标文件系统，确保 expunge 被发送到正确的 OBS/Mock 挂载点
+        # run_dual_cmd 会将 {TARGET} 替换为对应的 hdfs_base 和 obs_base
+        res_h, res_o = self.runner.run_dual_cmd("-fs", "{TARGET}", "-expunge")
         
         # 验证拦截逻辑
         self.validator.assert_results_match(res_h, res_o, feature_tag="expunge")

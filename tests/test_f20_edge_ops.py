@@ -1,7 +1,8 @@
 import pytest
 import logging
 import os
-from test_helpers import SnapshotSandbox, create_test_file
+# 引入 create_local_tmp_file 和 cleanup_local_tmp 以处理临时文件及挂载路径
+from test_helpers import SnapshotSandbox, create_test_file, create_local_tmp_file, cleanup_local_tmp
 
 logger = logging.getLogger("TestEdgeOps")
 
@@ -26,14 +27,23 @@ class TestEdgeOperations:
         """
         F20-01: 使用 moveFromLocal 写入 -> 快照 -> 验证内容隔离
         """
-        local_file = "/tmp/local_move_src.txt"
-        with open(local_file, "w") as f:
-            f.write("MOVE_FROM_LOCAL_DATA")
+        # 为 HDFS 和 OBSA 准备两份独立的数据源，防止第一个执行的 move 删掉文件导致第二个报错
+        host_h, container_h = create_local_tmp_file("MOVE_FROM_LOCAL_DATA")
+        host_o, container_o = create_local_tmp_file("MOVE_FROM_LOCAL_DATA")
         
         target_path = f"{self.sandbox.test_dir}/moved_file.dat"
         
-        # 执行 moveFromLocal (注意：这会删除本地文件，我们在测试中不关心本地消失，主要看远程)
-        res_h, res_o = self.runner.run_dual_cmd("-moveFromLocal", local_file, f"{{TARGET}}{target_path}")
+        # 手动组装并调用底层的 _execute 方法
+        hdfs_cmd = self.runner.base_cli + ["-moveFromLocal", container_h, f"{self.runner.hdfs_base}{target_path}"]
+        obs_cmd = self.runner.base_cli + ["-moveFromLocal", container_o, f"{self.runner.obs_base}{target_path}"]
+        
+        res_h = self.runner._execute(hdfs_cmd, "hdfs")
+        res_o = self.runner._execute(obs_cmd, "obs")
+        
+        # 清理残留文件（预防发生异常未能自动删除）
+        cleanup_local_tmp(host_h)
+        cleanup_local_tmp(host_o)
+        
         self.validator.assert_results_match(res_h, res_o, feature_tag="moveFromLocal")
         
         self.sandbox.create_snapshot("snap_after_move")

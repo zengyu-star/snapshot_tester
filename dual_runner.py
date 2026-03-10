@@ -109,7 +109,7 @@ class ParityValidator:
         "setfacl", "getfacl", "setfattr", "getfattr", 
         "concat", "ln", "setSpaceQuota", "clrSpaceQuota", 
         "setQuota", "clrQuota", "setStoragePolicy",
-        "expunge", "moveToLocal", "fsck"
+        "moveToLocal" # <--- 已将 "fsck" 从列表中移除
     ]
 
     def __init__(self, is_mock_mode: bool = False):
