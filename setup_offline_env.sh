@@ -33,6 +33,10 @@ if [ "$MODE" == "pack" ]; then
     sed -i 's|obs_admin_uri:.*|obs_admin_uri: "hdfs://localhost:9000/hadoop/obsa_test_workspace"|' config.yml
     sed -i 's|mock_obsa_mode:.*|mock_obsa_mode: false|' config.yml
 
+    echo ">>> 生成版本时间戳文件 (VERSION.txt)..."
+    echo "Build Time: $(date '+%Y-%m-%d %H:%M:%S')" > VERSION.txt
+    echo "Git Commit: $(git rev-parse --short HEAD 2>/dev/null || echo 'N/A')" >> VERSION.txt
+
     echo ">>> 依赖下载完成。正在打包整个测试工程..."
     
     # 获取父目录绝对路径
