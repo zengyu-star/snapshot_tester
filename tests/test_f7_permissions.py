@@ -54,6 +54,9 @@ class TestPermissionsIsolation:
 
     def test_f7_03_chmod_snapshot_forbidden(self, runner):
         """F7-03: 禁止对快照路径执行 chmod"""
+        if not runner.mock_mode:
+            # 只有在非 Mock 模式（即真实挂载 OBSA 的实测模式）下，才将其标记为预期失败
+            pytest.xfail(reason="根据设计文档，不支持OBSA场景下的Posix ACL操作")
         create_test_file(runner, f"{self.sandbox.test_dir}/no_chmod.dat")
         self.sandbox.create_snapshot("snap_v1")
 
@@ -64,6 +67,9 @@ class TestPermissionsIsolation:
 
     def test_f7_04_chown_snapshot_forbidden(self, runner):
         """F7-04: 禁止对快照路径执行 chown"""
+        if not runner.mock_mode:
+            # 只有在非 Mock 模式（即真实挂载 OBSA 的实测模式）下，才将其标记为预期失败
+            pytest.xfail(reason="根据设计文档，不支持OBSA场景下的Posix ACL操作")
         create_test_file(runner, f"{self.sandbox.test_dir}/no_chown.dat")
         self.sandbox.create_snapshot("snap_v1")
         

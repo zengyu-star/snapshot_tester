@@ -88,6 +88,9 @@ class TestDeepNesting:
 
     def test_f13_03_wide_directory_batch_rm(self, runner):
         """F13-03: 宽目录（大量文件）删除后的快照一致性"""
+        if not runner.mock_mode:
+            # 只有在非 Mock 模式（即真实挂载 OBSA 的实测模式）下，才将其标记为预期失败
+            pytest.xfail(reason="根据设计文档，不支持快照的文件的列举")
         wide_dir = f"{self.sandbox.test_dir}/wide"
         runner.run_dual_cmd("-mkdir", "-p", f"{{TARGET}}{wide_dir}")
         for i in range(20):

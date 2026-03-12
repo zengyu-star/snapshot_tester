@@ -39,6 +39,9 @@ class TestReplicationInteraction:
 
     def test_f8_02_setrep_snapshot_forbidden(self, runner):
         """F8-02: 禁止对快照路径执行 setrep"""
+        if not runner.mock_mode:
+            # 只有在非 Mock 模式（即真实挂载 OBSA 的实测模式）下，才将其标记为预期失败
+            pytest.xfail(reason="根据设计文档，不支持OBSA场景下的File replication factor操作")
         create_test_file(runner, f"{self.sandbox.test_dir}/no_rep.dat")
         self.sandbox.create_snapshot("snap_v1")
 

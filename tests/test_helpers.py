@@ -120,10 +120,13 @@ class SnapshotSandbox:
         return res_h, res_o
 
     def create_snapshot(self, snap_name):
+        # 【修复】：操作前先注册追踪，即使后续异常中断，teardown 也会尝试去删除它，保证防漏
+        if snap_name not in self._snapshots:
+            self._snapshots.append(snap_name)
+            
         res_h, res_o = self.runner.run_dual_cmd("-createSnapshot", f"{{TARGET}}{self.test_dir}", snap_name)
         assert res_h.returncode == 0, f"createSnapshot {snap_name} failed: {res_h.stderr}"
         assert res_o.returncode == 0, f"createSnapshot {snap_name} failed (OBS): {res_o.stderr}"
-        self._snapshots.append(snap_name)
         return res_h, res_o
 
     def delete_snapshot(self, snap_name):
