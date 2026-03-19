@@ -12,7 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from dual_runner import DualHadoopCommandRunner, ParityValidator
-from data_mutator import DataMutator
+from data_mutator import DataMutator, StressMutator
 
 class ObsaAwareDualRunner(DualHadoopCommandRunner):
     """
@@ -69,7 +69,7 @@ def validator(runner):
 @pytest.fixture(scope="session")
 def mutator(runner, config):
     """创建造数器（整个测试会话共享）"""
-    return DataMutator(runner, config.get("data_model", {}))
+    return StressMutator(runner, config.get("data_model", {}))
 
 
 # ==================== 日志增强 Hook ====================

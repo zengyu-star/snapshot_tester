@@ -21,11 +21,13 @@ class CmdResult:
     returncode: int
     stdout: str
     stderr: str
+    duration_ms: float = 0.0
 
 class DualHadoopCommandRunner:
     def __init__(self, hdfs_base_uri: str, obs_base_uri: str, config: dict = None):
         self.config = config or {}
         self.mock_mode = self.config.get("global", {}).get("mock_obsa_mode", False)
+        self.fault_config = {"protocol": None, "error_type": None}
         
         self.hdfs_base = hdfs_base_uri.rstrip('/')
         if self.mock_mode and obs_base_uri.startswith("obs://"):
@@ -47,22 +49,56 @@ class DualHadoopCommandRunner:
         # 顶层 hdfs 命令（如 snapshotDiff），不经过 dfs/dfsadmin 子命令
         self.hdfs_cli = [local_hdfs] if os.path.exists(local_hdfs) else ["hdfs"]
 
+    def inject_fault(self, protocol: str, error_type: str = "TIMEOUT"):
+        """手动注入一个模拟故障，仅对下一次执行生效"""
+        self.fault_config = {"protocol": protocol, "error_type": error_type}
+        logger.warning(f"Fault Injection ARM: Will simulate {error_type} for {protocol}")
+
     def _execute(self, cmd_list: List[str], protocol: str) -> CmdResult:
         full_cmd_str = " ".join(cmd_list)
+        
+        # 故障注入检查
+        if self.fault_config["protocol"] == protocol:
+            err = self.fault_config["error_type"]
+            self.fault_config = {"protocol": None, "error_type": None}
+            logger.warning(f"Simulating INJECTED FAULT: {err} for {protocol}")
+            
+            # 处理特殊的错误码
+            ret_code = -1
+            std_err = f"INJECTED_{err}"
+            
+            if err == "THROTTLING_429":
+                ret_code = 1
+                std_err = "OBS Service Error: 429 Too Many Requests (Slow Down)"
+            elif err == "SERVER_ERROR_503":
+                ret_code = 1
+                std_err = "OBS Service Error: 503 Service Unavailable"
+                
+            return CmdResult(
+                protocol=protocol, command=full_cmd_str,
+                returncode=ret_code, stdout="", stderr=std_err,
+                duration_ms=0.1
+            )
+
         logger.debug(f"Executing [{protocol.upper()}]: {full_cmd_str}")
         
+        import time
+        start_time = time.time()
         try:
             result = subprocess.run(
                 cmd_list, capture_output=True, text=True, timeout=300
             )
+            duration = (time.time() - start_time) * 1000
             return CmdResult(
                 protocol=protocol, command=full_cmd_str,
                 returncode=result.returncode,
-                stdout=result.stdout.strip(), stderr=result.stderr.strip()
+                stdout=result.stdout.strip(), stderr=result.stderr.strip(),
+                duration_ms=duration
             )
         except subprocess.TimeoutExpired:
+            duration = (time.time() - start_time) * 1000
             logger.error(f"Command timed out after 300s: {full_cmd_str}")
-            return CmdResult(protocol, full_cmd_str, -1, "", "TIMEOUT")
+            return CmdResult(protocol, full_cmd_str, -1, "", "TIMEOUT", duration_ms=duration)
 
     def run_dual_cmd(self, action: str, *args) -> Tuple[CmdResult, CmdResult]:
         """使用 {TARGET} 占位符动态组装标准命令"""
