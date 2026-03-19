@@ -1,6 +1,6 @@
-# OBSA 快照功能测试策略 (Functional Test Strategy)
+# OBSA 快照功能与非功能测试策略 (Full Test Strategy)
 
-本文档定义针对 OBSA 插件快照功能的**功能测试用例集**。每个用例通过"关键词链"表达测试链路，后续将据此生成 Python 测试脚本。
+本文档定义针对 OBSA 插件快照功能的**功能与非功能测试用例集**。每个用例通过"关键词链"表达测试链路，后续将据此生成 Python 测试脚本。
 
 > 核心方法论：遍历**快照命令 × Hadoop 原生命令 × 操作时序**的三维交互矩阵，确保高覆盖深度。
 
@@ -261,22 +261,61 @@ HDFS truncate 是对文件做截断操作，验证截小、截大场景与快照
 
 ---
 
+## 22. 性能测试 (Performance)
+
+验证快照在大规模数据情形下的响应耗时以及对主路写入性能的影响。
+
+| ID | 状态 | 测试链路 | 测试目标 | 代码位置 |
+|---|:---:|---|---|---|
+| P1-01 | ✅ | `批量造数(5/10/20) -> 分别打快照 -> 记录耗时 -> 验证 O(1) 趋势` | 验证快照创建耗时是否随文件数线性增长 | `test_latency_benchmarks.py::test_snapshot_o1_scaling` |
+| P1-02 | ✅ | `无快照写基准 -> 开启 5 个快照 -> 变异元数据 -> 再次写 -> 计算 Overhead` | 验证多快照场景下的写入性能损耗 | `test_overhead_benchmarks.py::test_write_overhead_on_snapshotted_dir` |
+
+---
+
+## 23. 可靠性测试 (Reliability)
+
+验证在异常、故障、并发等复杂场景下的系统行为，确保数据最终一致性。
+
+| ID | 状态 | 测试链路 | 测试目标 | 代码位置 |
+|---|:---:|---|---|---|
+| R1-01 | ✅ | `写入中途 Crash -> 立即打快照 -> 验证快照内文件状态` | 异常掉电/崩溃后的快照一致性 | `test_crash_consistency.py::test_partial_write_snapshot_consistency` |
+| R1-02 | ✅ | `append 写入中 kill 客户端 -> 立即打快照 -> 验证重启后状态` | 客户端进程暴力退出后的状态恢复 | `test_crash_consistency.py::test_process_kill_during_append` |
+| R1-03 | ✅ | `快照A -> 绕过 API 手动篡改底层对象 -> 快照恢复 -> 验证 Checksum 检错` | 静默损坏检测及快照隔离能力 | `test_data_integrity.py::test_silent_corruption_detection` |
+| R1-04 | ✅ | `deleteSnapshot 时注入网络超时 -> 再次删除 -> 验证幂等性与孤兒对象` | 快照异步 GC 过程中的中断韧性 | `test_gc_resilience.py::test_delete_snapshot_interruption_resilience` |
+| R1-05 | ✅ | `createSnapshot 时注入 Timeout -> 验证 OBS 侧报错 -> 清理 HDFS 侧幽灵快照` | 创建过程中的网络故障处理 | `test_network_faults.py::test_snapshot_create_with_timeout_sim` |
+| R1-06 | ✅ | `注入故障模拟分片 -> 状态裂脑 -> 正常请求尝试修复 -> 验证收敛一致` | 网络恢复后的状态自动修复(Convergence) | `test_network_faults.py::test_recovery_after_simulated_partition` |
+| R1-07 | ✅ | `注入 429/503 错误 -> 执行操作 -> 验证重试与报错透传` | 云端流控与服务端错误的弹性响应 | `test_network_faults.py::test_throttling_resilience` |
+| R1-08 | ✅ | `大规模 Rename 瞬间触发快照(并发) -> 验证快照元数据一致性` | POSIX 桶重命名原子性与快照的时序保证 | `test_rename_atomicity.py::test_concurrent_rename_and_snapshot` |
+
+---
+
+## 24. 压力测试 (Stress)
+
+验证极限边界条件下系统的稳定性。
+
+| ID | 状态 | 测试链路 | 测试目标 | 代码位置 |
+|---|:---:|---|---|---|
+| S1-01 | ✅ | `持续造数 + 打快照 (循环 100+) -> 检查链条完整性` | 极长快照链场景下的系统稳定性 | `test_limit_boundaries.py::test_long_snapshot_chain` |
+| S1-02 | ✅ | `构造包含 1000+ 文件的超宽目录 -> 打快照 -> 验证成功且耗时在阈值内` | 超大规模目录索引的快照能力 | `test_limit_boundaries.py::test_ultra_wide_directory_snapshot` |
+
+---
+
 ## 用例汇总与优先级
 
 ### 统计概览
 
 | 指标 | 数量 |
 |------|------|
-| **有效用例总数** | 65 |
-| ✅ 已实现 | 65 |
+| **有效用例总数** | 77 |
+| ✅ 已实现 | 77 |
 | ⬚ 未实现 | 0 |
 
 ### 优先级矩阵
 
 | 优先级 | 有效用例 ID | 已实现 | 未实现 | 覆盖率 |
 |-------|-----------|:------:|:------:|:------:|
-| **P0** | F1-01, F3-01~03, F3-05, F5-01, F9-01, F11-01~08 | 14 | 0 | **100%** |
-| **P1** | F1-02, F1-03, F1-05~F1-09, F3-06~07, F4-01~06, F5-02~06, F7-01~05, F8-01~02, F16-01, F16-02, F19-01, F19-02 | 28 | 0 | **100%** |
-| **P2** | F6-01~05, F9-02~05, F10-01~04, F12-01~02, F13-01~04, F14-01~03, F15-01~02, F16-03, F17-01, F18-01~02, F20-01~04, F21-01 | 23 | 0 | **100%** |
+| **P0** | F1-01, F3-01~03, F3-05, F5-01, F9-01, F11-01~08, R1-01, R1-08 | 16 | 0 | **100%** |
+| **P1** | F1-02, F1-03, F1-05~F1-09, F3-06~07, F4-01~06, F5-02~06, F7-01~05, F8-01~02, F16-01, F16-02, F19-01, F19-02, P1-02, R1-03, R1-05, S1-01 | 32 | 0 | **100%** |
+| **P2** | F6-01~05, F9-02~05, F10-01~04, F12-01~02, F13-01~04, F14-01~03, F15-01~02, F16-03, F17-01, F18-01~02, F20-01~04, F21-01, P1-01, R1-02, R1-04, R1-06, R1-07, S1-02 | 29 | 0 | **100%** |
 
 > **已实现 100% HDFS 命令集与快照场景的交互测试。**
