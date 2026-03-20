@@ -59,8 +59,9 @@ def test_process_kill_during_append(runner):
         f.write(os.urandom(1024 * 1024 * 10)) # 10MB
     
     logger.info("Starting background append operation...")
-    # 这里直接调用底层命令以获得 PID
-    cmd = ["./hdfs", "dfs", "-appendToFile", local_big_file, f"{runner.obs_base}{test_file}"]
+    
+    # 使用 runner.base_cli 动态适配执行环境中的 hdfs 命令前缀
+    cmd = runner.base_cli + ["-appendToFile", local_big_file, f"{runner.obs_base}{test_file}"]
     process = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     
     # 等待一会，确保写入已开始

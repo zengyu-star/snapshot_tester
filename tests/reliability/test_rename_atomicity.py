@@ -4,7 +4,8 @@ from data_mutator import StressMutator
 
 logger = logging.getLogger("TestRenameAtomicity")
 
-def test_concurrent_rename_and_snapshot(runner, mutator):
+# 修改点 1：在参数列表中增加了全局 fixture 'validator'
+def test_concurrent_rename_and_snapshot(runner, mutator, validator):
     """
     场景: 在大规模目录重命名 (Rename) 的瞬间触发快照。
     验证: POSIX 桶的原子性保证，快照内元数据的一致性（要么是旧路径，要么是新路径，不存在中间态）。
@@ -30,8 +31,8 @@ def test_concurrent_rename_and_snapshot(runner, mutator):
 
     logger.info(f"Rename Result (OBS): {res_mv_obs.returncode}, Snapshot Result (OBS): {res_snap_obs.returncode}")
     
-    # 验证一致性
-    validator = ParityValidator(runner.mock_mode)
+    # 修改点 2：删除了手动实例化的 validator = ParityValidator(runner.mock_mode)
+    # 验证一致性 (直接使用通过参数传入的 validator)
     validator.assert_results_match(res_snap_hdfs, res_snap_obs, "createSnapshot")
     
     # 检查快照内容，对应重命名后的状态
