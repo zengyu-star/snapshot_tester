@@ -45,7 +45,8 @@ class TestUnsupportedMetadata:
         F16-02: 造数 -> setfacl 设置访问控制列表 -> 快照 -> getfacl 读取
         目标：验证 ACL 拦截逻辑。
         """
-        if not runner.mock_mode:
+        # 【修复点】：增加 self. 前缀，调用类属性
+        if not self.runner.mock_mode:
             # 只有在非 Mock 模式（即真实挂载 OBSA 的实测模式）下，才将其标记为预期失败
             pytest.xfail(reason="官方文档，OBSA挂载场景下，不支持Posix ACL")
         test_file = f"{self.sandbox.test_dir}/acl_file.dat"
